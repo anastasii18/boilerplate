@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package inventory.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+option go_package = "/pkg/proto/inventory/v1;inventory_v1";
+
+service InventoryService {
+  // Возвращает информацию о детали по её UUID.
+  rpc GetPart(GetPartRequest) returns (GetPartResponse);
+
+  // Возвращает список деталей с возможностью фильтрации
+  rpc GetListParts(GetListPartsRequest) returns (GetListPartsResponse);
+}
+
+// Структура Part
+message Part {
+  google.protobuf.Timestamp observed_at = 1;
+
+  // Уникальный идентификатор детали
+  string uuid = 2;
+
+  // Название детали
+  string name = 3;
+
+  // Описание детали
+  string description = 4;
+
+  // Цена за единицу
+  double price = 5;
+
+  // Количество на складе
+  int64 stock_quantity = 6;
+
+  // Категория
+  Category category = 7;
+
+  // Размеры детали
+  Dimensions dimensions = 8;
+
+  // Информация о производителе
+  Manufacturer manufacturer = 9;
+
+  // Теги для быстрого поиска
+  repeated string tags = 10;
+
+  // Гибкие метаданные
+  map<string, Value> metadata = 11;
+
+  // Дата создания
+  google.protobuf.Timestamp created_at = 12;
+
+  // Дата обновления
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+// Категория
+enum Category {
+  CATEGORY_UNSPECIFIED = 0;        // Неизвестная категория
+  CATEGORY_ENGINE = 1;         // Двигатель
+  CATEGORY_FUEL = 2;           // Топливо
+  CATEGORY_PORTHOLE = 3;       // Иллюминатор
+  CATEGORY_WING = 4;           // Крыло
+}
+
+// Размеры детали
+message Dimensions {
+  // Длина в см
+  google.protobuf.DoubleValue length = 1;
+  // Ширина в см
+  google.protobuf.DoubleValue width = 2;
+  // Высота в см
+  google.protobuf.DoubleValue height = 3;
+  // Вес в кг
+  google.protobuf.DoubleValue weight = 4;
+}
+
+// Информация о производителе
+message Manufacturer {
+  // Название
+  string name = 1;
+  // Страна производства
+  string country = 2;
+  // Сайт производителя
+  string website = 3;
+}
+
+// Гибкие метаданные
+message Value {
+  oneof meta_value {
+    google.protobuf.StringValue string_value = 1;
+    google.protobuf.Int64Value int64_value = 2;
+    google.protobuf.DoubleValue double_value = 3;
+    google.protobuf.BoolValue bool_value = 4;
+  }
+}
+
+// Фильтр по деталям
+message PartsFilter {
+  // Список UUID'ов
+  repeated string uuids = 1;
+  // Список имён
+  repeated string names = 2;
+  // Список категорий
+  repeated Category categories = 3;
+  // Список стран производителей
+  repeated string manufacturer_countries = 4;
+  // Список тегов
+  repeated string tags = 5;
+}
+
+// GetPartRequest запрос на получение информации о детали по её UUID
+message GetPartRequest {
+  // Идентификатор детали
+  string uuid = 1;
+}
+
+// GetPartResponse ответ с информацией о детали
+message GetPartResponse {
+  // Информация о детали
+  Part part = 1;
+}
+
+// GetListPartsRequest запрос на получение деталей с возможностью фильтрации
+message GetListPartsRequest {
+  // Фильтр по деталям
+  PartsFilter filter = 1;
+}
+
+// GetListPartsResponse ответ с информацией о деталях
+message GetListPartsResponse{
+  // Список найденных деталей
+  repeated Part parts = 1;
+}

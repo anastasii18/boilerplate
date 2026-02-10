@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package payment.v1;
+
+option go_package = "/pkg/proto/payment/v1;payment_v1";
+
+service PaymentService {
+  // Обрабатывает команду на оплату и возвращает `transaction_uuid`
+  rpc PayOrder(PayOrderRequest) returns (PayOrderResponse);
+}
+
+// Способ оплаты
+enum PaymentMethod {
+    PAYMENT_METHOD_UNSPECIFIED = 0;         // Неизвестный способ
+    PAYMENT_METHOD_CARD = 1;            // Банковская карта
+    PAYMENT_METHOD_SBP = 2;             // Система быстрых платежей
+    PAYMENT_METHOD_CREDIT_CARD = 3;     // Кредитная карта
+    PAYMENT_METHOD_INVESTOR_MONEY = 4 ; // Деньги инвестора (внутренний метод)
+}
+
+// PayOrderRequest запрос на оплату
+message PayOrderRequest {
+  // UUID заказа
+  string order_uuid = 1;
+
+  // UUID пользователя, который инициирует оплату
+  string user_uuid = 2;
+
+  // Выбранный способ оплаты
+  PaymentMethod payment_method = 3;
+}
+
+// PayOrderResponse ответ с UUID транзакции оплаты
+message PayOrderResponse {
+  // UUID транзакции оплаты
+  string transaction_uuid = 1;
+}
