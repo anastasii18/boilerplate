@@ -9,7 +9,7 @@ import (
 	api "order/pkg/api/v1"
 	"order/pkg/client/inventory"
 	"order/pkg/client/payment"
-	"order/pkg/db"
+	"order/pkg/repository"
 	inventoryV1 "shared/pkg/proto/inventory/v1"
 	paymentV1 "shared/pkg/proto/payment/v1"
 	"time"
@@ -27,14 +27,14 @@ type Config struct {
 
 type App struct {
 	Config          *Config
-	Storage         *db.OrderStorage
+	Storage         *repository.Repository
 	Server          *http.Server
 	InventoryClient inventoryV1.InventoryServiceClient
 	PaymentClient   paymentV1.PaymentServiceClient
 }
 
 func New(config *Config, serverInventoryAddress, serverPaymentAddress string) *App {
-	a := &App{Config: config, Storage: db.NewOrderStorage()}
+	a := &App{Config: config, Storage: repository.NewRepository()}
 
 	a.InventoryClient = inventory.NewClient(serverInventoryAddress)
 	a.PaymentClient = payment.NewClient(serverPaymentAddress)
@@ -43,7 +43,7 @@ func New(config *Config, serverInventoryAddress, serverPaymentAddress string) *A
 	return a
 }
 
-func (a *App) createRouter() *chi.Mux {
+func (app *App) createRouter() *chi.Mux {
 	// Инициализируем роутер Chi
 	r := chi.NewRouter()
 
@@ -53,16 +53,17 @@ func (a *App) createRouter() *chi.Mux {
 	r.Use(middleware.Timeout(10 * time.Second))
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 
+	a := api.New()
 	// Определяем маршруты
 	r.Route("/api/v1/orders", func(r chi.Router) {
 		// Получить заказ по UUID
-		r.Get("/{order_uuid}", api.GetOrderHandler(a.Storage))
+		r.Get("/{order_uuid}", a.GetOrderHandler())
 		// Создание заказа
-		r.Post("/", api.CreateOrderHandler(a.Storage, a.InventoryClient))
+		r.Post("/", a.CreateOrderHandler(app.InventoryClient))
 		// Оплата заказа
-		r.Post("/{order_uuid}/pay", api.PayOrderHandler(a.Storage, a.PaymentClient))
+		r.Post("/{order_uuid}/pay", a.PayOrderHandler(app.PaymentClient))
 		// Отменить заказ
-		r.Post("/{order_uuid}/cancel", api.CancelOrderHandler(a.Storage))
+		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler())
 	})
 
 	return r

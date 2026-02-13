@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	rpc "payment/pkg/grpc"
+	repo "payment/pkg/repository"
+	serv "payment/pkg/service"
 	paymentV1 "shared/pkg/proto/payment/v1"
 
 	"google.golang.org/grpc"
@@ -17,12 +19,14 @@ type Config struct {
 
 type App struct {
 	Config         *Config
-	paymentService *rpc.PaymentService
+	paymentService *rpc.Api
 	Server         *grpc.Server
 }
 
 func New(config *Config) *App {
-	return &App{Config: config, paymentService: rpc.NewPaymentService(), Server: grpc.NewServer()}
+	r := repo.NewRepository()
+	service := serv.NewService(r)
+	return &App{Config: config, paymentService: rpc.NewApi(service), Server: grpc.NewServer()}
 }
 
 func (a *App) createServer() {

@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"inventory/pkg/db"
 	rpc "inventory/pkg/grpc"
 	"log"
 	"net"
@@ -18,17 +17,16 @@ type Config struct {
 
 type App struct {
 	Config           *Config
-	inventoryService *rpc.InventoryService
+	inventoryService *rpc.Api
 	Server           *grpc.Server
-	dbc              *db.DB
 }
 
-func New(port int, dbc *db.DB) *App {
-	return &App{Config: &Config{Port: port}, Server: grpc.NewServer(), dbc: dbc}
+func New(port int) *App {
+	return &App{Config: &Config{Port: port}, Server: grpc.NewServer()}
 }
 
 func (a *App) createServer() {
-	a.inventoryService = rpc.NewInventoryService(a.dbc)
+	a.inventoryService = rpc.New()
 	inventoryV1.RegisterInventoryServiceServer(a.Server, a.inventoryService)
 }
 

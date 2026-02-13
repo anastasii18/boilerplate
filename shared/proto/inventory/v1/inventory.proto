@@ -17,43 +17,41 @@ service InventoryService {
 
 // Структура Part
 message Part {
-  google.protobuf.Timestamp observed_at = 1;
-
   // Уникальный идентификатор детали
-  string uuid = 2;
+  string uuid = 1;
 
   // Название детали
-  string name = 3;
+  string name = 2;
 
   // Описание детали
-  string description = 4;
+  string description = 3;
 
   // Цена за единицу
-  double price = 5;
+  double price = 4;
 
   // Количество на складе
-  int64 stock_quantity = 6;
+  int64 stock_quantity = 5;
 
   // Категория
-  Category category = 7;
+  Category category = 6;
 
   // Размеры детали
-  Dimensions dimensions = 8;
+  Dimensions dimensions = 7;
 
   // Информация о производителе
-  Manufacturer manufacturer = 9;
+  Manufacturer manufacturer = 8;
 
   // Теги для быстрого поиска
-  repeated string tags = 10;
+  repeated string tags = 9;
 
   // Гибкие метаданные
-  map<string, Value> metadata = 11;
+  map<string, Value> metadata = 10;
 
   // Дата создания
-  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp created_at = 11;
 
   // Дата обновления
-  google.protobuf.Timestamp updated_at = 13;
+  google.protobuf.Timestamp updated_at = 12;
 }
 
 // Категория

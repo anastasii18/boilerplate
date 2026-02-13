@@ -3,6 +3,7 @@ module inventory
 go 1.24.0
 
 require (
+	github.com/samber/lo v1.52.0
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
 )

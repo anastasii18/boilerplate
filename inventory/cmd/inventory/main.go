@@ -2,7 +2,6 @@ package main
 
 import (
 	"inventory/pkg/app"
-	"inventory/pkg/db"
 	"log"
 	"os"
 	"os/signal"
@@ -13,7 +12,7 @@ const grpcPort = 50051
 
 func main() {
 	// Регистрируем наш сервис
-	a := app.New(grpcPort, db.NewDB())
+	a := app.New(grpcPort)
 	a.Start()
 
 	// Graceful shutdown
