@@ -3,12 +3,11 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	inventoryConverter "inventory/pkg/converter"
-	inventoryModel "inventory/pkg/model"
+	inventoryApi "inventory/pkg/grpc"
+	inventoryService "inventory/pkg/service"
 	"log"
 	"net/http"
-	"order/pkg/model"
-	"order/pkg/repository"
+	"order/pkg/db"
 	"order/pkg/service"
 	inventoryV1 "shared/pkg/proto/inventory/v1"
 	paymentV1 "shared/pkg/proto/payment/v1"
@@ -34,7 +33,7 @@ func New() *Api {
 func (a *Api) CreateOrderHandler(inventoryClient inventoryV1.InventoryServiceClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Декодируем данные из тела запроса
-		var orderCreate model.Order
+		var orderCreate service.Order
 		if err := json.NewDecoder(r.Body).Decode(&orderCreate); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
@@ -47,9 +46,9 @@ func (a *Api) CreateOrderHandler(inventoryClient inventoryV1.InventoryServiceCli
 		}
 		ctx := r.Context()
 		parts, err := inventoryClient.GetListParts(ctx, getListPartsRequest)
-		var newParts []*inventoryModel.Part
+		var newParts []*inventoryService.Part
 		for _, part := range parts.Parts {
-			newParts = append(newParts, inventoryConverter.PartToModel(part))
+			newParts = append(newParts, inventoryApi.PartToModel(part))
 		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -110,7 +109,7 @@ func (a *Api) PayOrderHandler(paymentClient paymentV1.PaymentServiceClient) http
 		}
 
 		type PayBody struct {
-			PaymentMethod repository.OrderPaymentMethod `json:"payment_method"`
+			PaymentMethod db.OrderPaymentMethod `json:"payment_method"`
 		}
 
 		// Декодируем данные из тела запроса
@@ -132,7 +131,7 @@ func (a *Api) PayOrderHandler(paymentClient paymentV1.PaymentServiceClient) http
 			return
 		}
 
-		err = a.orderService.UpdateOrder(orderId, lo.ToPtr(payOrderResponse.GetTransactionUuid()), lo.ToPtr(model.PAID), lo.ToPtr(model.OrderPaymentMethod(payBody.PaymentMethod)))
+		err = a.orderService.UpdateOrder(orderId, lo.ToPtr(payOrderResponse.GetTransactionUuid()), lo.ToPtr(service.PAID), lo.ToPtr(service.OrderPaymentMethod(payBody.PaymentMethod)))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -161,17 +160,17 @@ func (a *Api) CancelOrderHandler() http.HandlerFunc {
 			return
 		}
 
-		if orderData.Status == model.PAID {
+		if orderData.Status == service.PAID {
 			http.Error(w, fmt.Sprintf("Order with ID '%s' has already been paid and cannot be cancelled.", orderId), http.StatusConflict)
 			return
 		}
 
-		if orderData.Status == model.CANCELLED {
+		if orderData.Status == service.CANCELLED {
 			http.Error(w, fmt.Sprintf("Order with ID '%s' has been cancelled.", orderId), http.StatusConflict)
 			return
 		}
 
-		err = a.orderService.UpdateOrder(orderId, nil, lo.ToPtr(model.CANCELLED), nil)
+		err = a.orderService.UpdateOrder(orderId, nil, lo.ToPtr(service.CANCELLED), nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

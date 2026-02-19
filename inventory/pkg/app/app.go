@@ -2,7 +2,9 @@ package app
 
 import (
 	"fmt"
+	"inventory/pkg/db"
 	rpc "inventory/pkg/grpc"
+	"inventory/pkg/service"
 	"log"
 	"net"
 	inventoryV1 "shared/pkg/proto/inventory/v1"
@@ -17,17 +19,23 @@ type Config struct {
 
 type App struct {
 	Config           *Config
-	inventoryService *rpc.Api
+	inventoryApi     *rpc.Api
+	inventoryService service.InventoryService
+	repository       *db.Repository
 	Server           *grpc.Server
 }
 
 func New(port int) *App {
-	return &App{Config: &Config{Port: port}, Server: grpc.NewServer()}
+	a := &App{Config: &Config{Port: port}, Server: grpc.NewServer()}
+	a.repository = db.NewRepository().Seed()
+	a.inventoryService = service.NewService(a.repository)
+
+	return a
 }
 
 func (a *App) createServer() {
-	a.inventoryService = rpc.New()
-	inventoryV1.RegisterInventoryServiceServer(a.Server, a.inventoryService)
+	a.inventoryApi = rpc.New(a.inventoryService)
+	inventoryV1.RegisterInventoryServiceServer(a.Server, a.inventoryApi)
 }
 
 func (a *App) Start() {

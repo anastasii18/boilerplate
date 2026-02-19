@@ -1,12 +1,23 @@
-package repository
+package service
 
-import "inventory/pkg/model"
+import (
+	repomodel "inventory/pkg/db"
+)
 
-func RepoModelToPart(part *Part) *model.Part {
-	var metadata = make(map[string]*model.Value)
+func FilterToRepoFilter(filter PartSearch) repomodel.PartSearch {
+	var categories []repomodel.Category
+	for _, category := range filter.Categories {
+		categories = append(categories, repomodel.Category(category))
+	}
+
+	return repomodel.NewPartSearch(categories, filter.Uuids, filter.Names, filter.ManufacturerCountries, filter.Tags)
+}
+
+func RepoModelToModel(part *repomodel.Part) *Part {
+	var metadata = make(map[string]*Value)
 	if part.Metadata != nil {
 		for key, value := range part.Metadata {
-			v := &model.Value{}
+			v := &Value{}
 
 			if value.StringVal != nil {
 				v.StringVal = value.StringVal
@@ -22,9 +33,9 @@ func RepoModelToPart(part *Part) *model.Part {
 		}
 	}
 
-	var dimensions *model.Dimensions
+	var dimensions *Dimensions
 	if part.Dimensions != nil {
-		dimensions = &model.Dimensions{
+		dimensions = &Dimensions{
 			Length: part.Dimensions.Length,
 			Width:  part.Dimensions.Width,
 			Height: part.Dimensions.Height,
@@ -32,21 +43,21 @@ func RepoModelToPart(part *Part) *model.Part {
 		}
 	}
 
-	var manufacturer *model.Manufacturer
+	var manufacturer *Manufacturer
 	if part.Manufacturer != nil {
-		manufacturer = &model.Manufacturer{
+		manufacturer = &Manufacturer{
 			Name:    part.Manufacturer.Name,
 			Country: part.Manufacturer.Country,
 			Website: part.Manufacturer.Website,
 		}
 	}
-	return &model.Part{
+	return &Part{
 		Uuid:          part.Uuid,
 		Name:          part.Name,
 		Description:   part.Description,
 		Price:         part.Price,
 		StockQuantity: part.StockQuantity,
-		Category:      model.Category(part.Category),
+		Category:      Category(part.Category),
 		Dimensions:    dimensions,
 		Manufacturer:  manufacturer,
 		Tags:          part.Tags,

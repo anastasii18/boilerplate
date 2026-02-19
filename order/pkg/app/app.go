@@ -9,7 +9,7 @@ import (
 	api "order/pkg/api/v1"
 	"order/pkg/client/inventory"
 	"order/pkg/client/payment"
-	"order/pkg/repository"
+	"order/pkg/db"
 	inventoryV1 "shared/pkg/proto/inventory/v1"
 	paymentV1 "shared/pkg/proto/payment/v1"
 	"time"
@@ -27,14 +27,14 @@ type Config struct {
 
 type App struct {
 	Config          *Config
-	Storage         *repository.Repository
+	Storage         *db.Repository
 	Server          *http.Server
 	InventoryClient inventoryV1.InventoryServiceClient
 	PaymentClient   paymentV1.PaymentServiceClient
 }
 
 func New(config *Config, serverInventoryAddress, serverPaymentAddress string) *App {
-	a := &App{Config: config, Storage: repository.NewRepository()}
+	a := &App{Config: config, Storage: db.NewRepository()}
 
 	a.InventoryClient = inventory.NewClient(serverInventoryAddress)
 	a.PaymentClient = payment.NewClient(serverPaymentAddress)

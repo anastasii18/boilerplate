@@ -1,10 +1,15 @@
-package repository
+package db
 
 import (
 	"fmt"
-	"order/pkg/model"
 	"sync"
 )
+
+type OrderRepository interface {
+	CreateOrder(order *Order)
+	GetOrder(orderUuid string) (*Order, error)
+	UpdateOrder(orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
+}
 
 type Repository struct {
 	mu     sync.RWMutex
@@ -26,7 +31,7 @@ func (r *Repository) CreateOrder(order *Order) {
 	r.orders[order.OrderUuid] = order
 }
 
-func (r *Repository) GetOrder(orderUuid string) (*model.Order, error) {
+func (r *Repository) GetOrder(orderUuid string) (*Order, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	order, ok := r.orders[orderUuid]
@@ -34,10 +39,10 @@ func (r *Repository) GetOrder(orderUuid string) (*model.Order, error) {
 		return nil, fmt.Errorf("order with id %s not found", orderUuid)
 	}
 
-	return OrderToModel(order), nil
+	return order, nil
 }
 
-func (r *Repository) UpdateOrder(orderUuid string, transactionUuid *string, status *model.OrderStatus, paymentMethod *model.OrderPaymentMethod) error {
+func (r *Repository) UpdateOrder(orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	_, ok := r.orders[orderUuid]
@@ -51,11 +56,11 @@ func (r *Repository) UpdateOrder(orderUuid string, transactionUuid *string, stat
 	}
 
 	if status != nil {
-		r.orders[orderUuid].Status = OrderStatus(*status)
+		r.orders[orderUuid].Status = *status
 	}
 
 	if paymentMethod != nil {
-		r.orders[orderUuid].PaymentMethod = OrderPaymentMethod(*paymentMethod)
+		r.orders[orderUuid].PaymentMethod = *paymentMethod
 	}
 
 	return nil
