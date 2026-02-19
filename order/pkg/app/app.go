@@ -10,8 +10,7 @@ import (
 	"order/pkg/client/inventory"
 	"order/pkg/client/payment"
 	"order/pkg/db"
-	inventoryV1 "shared/pkg/proto/inventory/v1"
-	paymentV1 "shared/pkg/proto/payment/v1"
+	"order/pkg/service"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,15 +28,16 @@ type App struct {
 	Config          *Config
 	Storage         *db.Repository
 	Server          *http.Server
-	InventoryClient inventoryV1.InventoryServiceClient
-	PaymentClient   paymentV1.PaymentServiceClient
+	OrderService    service.OrderService
+	InventoryClient inventory.Client
+	PaymentClient   payment.Client
 }
 
 func New(config *Config, serverInventoryAddress, serverPaymentAddress string) *App {
-	a := &App{Config: config, Storage: db.NewRepository()}
+	a := &App{Config: config, Storage: db.NewRepository(), OrderService: service.NewService()}
 
-	a.InventoryClient = inventory.NewClient(serverInventoryAddress)
-	a.PaymentClient = payment.NewClient(serverPaymentAddress)
+	a.InventoryClient, _ = inventory.NewClient(serverInventoryAddress)
+	a.PaymentClient, _ = payment.NewClient(serverPaymentAddress)
 	a.createServer(a.createRouter())
 
 	return a
@@ -53,7 +53,7 @@ func (app *App) createRouter() *chi.Mux {
 	r.Use(middleware.Timeout(10 * time.Second))
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 
-	a := api.New()
+	a := api.New(app.OrderService)
 	// Определяем маршруты
 	r.Route("/api/v1/orders", func(r chi.Router) {
 		// Получить заказ по UUID

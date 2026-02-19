@@ -5,12 +5,11 @@ import (
 	inventoryV1 "shared/pkg/proto/inventory/v1"
 	"time"
 
-	"github.com/samber/lo"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-func ModelToPart(part *service.Part) *inventoryV1.Part {
+func NewPart(part *service.Part) *inventoryV1.Part {
 	var category inventoryV1.Category
 	category = inventoryV1.Category(part.Category)
 
@@ -87,7 +86,7 @@ func ModelToPart(part *service.Part) *inventoryV1.Part {
 	}
 }
 
-func PartToModel(part *inventoryV1.Part) *service.Part {
+func NewServicePart(part *inventoryV1.Part) *service.Part {
 	var category service.Category
 	category = service.Category(part.Category.Number())
 
@@ -142,7 +141,7 @@ func PartToModel(part *inventoryV1.Part) *service.Part {
 
 	var updatedAt *time.Time
 	if part.UpdatedAt != nil {
-		updatedAt = lo.ToPtr(part.UpdatedAt.AsTime())
+		updatedAt = Ptr(part.UpdatedAt.AsTime())
 	}
 
 	return &service.Part{
@@ -161,11 +160,19 @@ func PartToModel(part *inventoryV1.Part) *service.Part {
 	}
 }
 
-func ProtoFilterToFilter(filter *inventoryV1.PartsFilter) service.PartSearch {
+func NewPartSearch(filter *inventoryV1.PartsFilter) service.PartSearch {
 	var categories []service.Category
 	for _, category := range filter.Categories {
 		categories = append(categories, service.Category(category))
 	}
 
 	return service.NewPartSearch(categories, filter.Uuids, filter.Names, filter.ManufacturerCountries, filter.Tags)
+}
+
+func Ptr[T comparable](t T) *T {
+	var def T
+	if t == def {
+		return nil
+	}
+	return &t
 }

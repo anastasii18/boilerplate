@@ -3,18 +3,14 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	inventoryApi "inventory/pkg/grpc"
-	inventoryService "inventory/pkg/service"
 	"log"
 	"net/http"
-	"order/pkg/db"
+	"order/pkg/client/inventory"
+	"order/pkg/client/payment"
 	"order/pkg/service"
-	inventoryV1 "shared/pkg/proto/inventory/v1"
-	paymentV1 "shared/pkg/proto/payment/v1"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/samber/lo"
 )
 
 const urlParam = "order_uuid"
@@ -23,14 +19,14 @@ type Api struct {
 	orderService service.OrderService
 }
 
-func New() *Api {
+func New(service service.OrderService) *Api {
 	return &Api{
-		orderService: service.NewService(),
+		orderService: service,
 	}
 }
 
 // Создаёт новый заказ на основе выбранных пользователем деталей.
-func (a *Api) CreateOrderHandler(inventoryClient inventoryV1.InventoryServiceClient) http.HandlerFunc {
+func (a *Api) CreateOrderHandler(inventoryClient inventory.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Декодируем данные из тела запроса
 		var orderCreate service.Order
@@ -38,23 +34,14 @@ func (a *Api) CreateOrderHandler(inventoryClient inventoryV1.InventoryServiceCli
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-
-		getListPartsRequest := &inventoryV1.GetListPartsRequest{
-			Filter: &inventoryV1.PartsFilter{
-				Uuids: orderCreate.PartUuids,
-			},
-		}
 		ctx := r.Context()
-		parts, err := inventoryClient.GetListParts(ctx, getListPartsRequest)
-		var newParts []*inventoryService.Part
-		for _, part := range parts.Parts {
-			newParts = append(newParts, inventoryApi.PartToModel(part))
-		}
+		parts, err := inventoryClient.GetListParts(ctx, orderCreate.PartUuids)
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
+		newParts := inventoryClient.GetInventoryParts(parts)
 		err = a.orderService.CreateOrder(ctx, &orderCreate, newParts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -94,7 +81,7 @@ func (a *Api) GetOrderHandler() http.HandlerFunc {
 }
 
 // Проводит оплату ранее созданного заказа.
-func (a *Api) PayOrderHandler(paymentClient paymentV1.PaymentServiceClient) http.HandlerFunc {
+func (a *Api) PayOrderHandler(paymentClient payment.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		orderId := chi.URLParam(r, urlParam)
 		if orderId == "" {
@@ -108,40 +95,27 @@ func (a *Api) PayOrderHandler(paymentClient paymentV1.PaymentServiceClient) http
 			return
 		}
 
-		type PayBody struct {
-			PaymentMethod db.OrderPaymentMethod `json:"payment_method"`
-		}
-
 		// Декодируем данные из тела запроса
-		var payBody PayBody
+		var payBody service.PayBody
 		if err := json.NewDecoder(r.Body).Decode(&payBody); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		payOrderRequest := &paymentV1.PayOrderRequest{
-			OrderUuid:     orderId,
-			UserUuid:      orderData.UserUuid,
-			PaymentMethod: paymentV1.PaymentMethod(payBody.PaymentMethod),
-		}
 		ctx := r.Context()
-		payOrderResponse, err := paymentClient.PayOrder(ctx, payOrderRequest)
+		payOrderResponse, err := paymentClient.PayOrder(ctx, orderId, orderData.UserUuid, payBody.PaymentMethod)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		err = a.orderService.UpdateOrder(orderId, lo.ToPtr(payOrderResponse.GetTransactionUuid()), lo.ToPtr(service.PAID), lo.ToPtr(service.OrderPaymentMethod(payBody.PaymentMethod)))
+		err = a.orderService.UpdateOrder(orderId, Ptr(payOrderResponse.GetTransactionUuid()), Ptr(service.PAID), Ptr(service.OrderPaymentMethod(payBody.PaymentMethod)))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		type PayResponse struct {
-			TransactionUuid string `json:"transaction_uuid"`
-		}
-
-		render.JSON(w, r, PayResponse{payOrderResponse.GetTransactionUuid()})
+		render.JSON(w, r, service.PayResponse{payOrderResponse.GetTransactionUuid()})
 	}
 }
 
@@ -170,7 +144,7 @@ func (a *Api) CancelOrderHandler() http.HandlerFunc {
 			return
 		}
 
-		err = a.orderService.UpdateOrder(orderId, nil, lo.ToPtr(service.CANCELLED), nil)
+		err = a.orderService.UpdateOrder(orderId, nil, Ptr(service.CANCELLED), nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -178,4 +152,12 @@ func (a *Api) CancelOrderHandler() http.HandlerFunc {
 		render.NoContent(w, r)
 		log.Printf("Order with ID '%s' has been successfully cancelled.", orderId)
 	}
+}
+
+func Ptr[T comparable](t T) *T {
+	var def T
+	if t == def {
+		return nil
+	}
+	return &t
 }

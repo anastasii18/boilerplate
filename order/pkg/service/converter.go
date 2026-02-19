@@ -2,8 +2,6 @@ package service
 
 import (
 	repomodel "order/pkg/db"
-
-	"github.com/samber/lo"
 )
 
 func OrderToRepoModel(order *Order) *repomodel.Order {
@@ -31,9 +29,25 @@ func RepoModelToOrder(order *repomodel.Order) *Order {
 }
 
 func StatusToRepoStatus(status *OrderStatus) *repomodel.OrderStatus {
-	return lo.ToPtr(repomodel.OrderStatus(lo.FromPtr(status)))
+	return Ptr(repomodel.OrderStatus(Val(status)))
 }
 
 func PaymentMethodToRepoPaymentMethod(paymentMethod *OrderPaymentMethod) *repomodel.OrderPaymentMethod {
-	return lo.ToPtr(repomodel.OrderPaymentMethod(lo.FromPtr(paymentMethod)))
+	return Ptr(repomodel.OrderPaymentMethod(Val(paymentMethod)))
+}
+
+func Val[T any, P *T](p P) T {
+	if p != nil {
+		return *p
+	}
+	var def T
+	return def
+}
+
+func Ptr[T comparable](t T) *T {
+	var def T
+	if t == def {
+		return nil
+	}
+	return &t
 }

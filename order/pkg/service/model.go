@@ -34,6 +34,14 @@ const (
 	INVESTOR_MONEY OrderPaymentMethod = 4
 )
 
+type PayResponse struct {
+	TransactionUuid string `json:"transaction_uuid"`
+}
+
+type PayBody struct {
+	PaymentMethod OrderPaymentMethod `json:"payment_method"`
+}
+
 func (m *OrderPaymentMethod) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {

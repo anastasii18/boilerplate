@@ -1,19 +1,19 @@
 package service
 
 import (
-	repomodel "inventory/pkg/db"
+	"inventory/pkg/db"
 )
 
-func FilterToRepoFilter(filter PartSearch) repomodel.PartSearch {
-	var categories []repomodel.Category
-	for _, category := range filter.Categories {
-		categories = append(categories, repomodel.Category(category))
+func (ps *PartSearch) ToDB() db.PartSearch {
+	var categories []db.Category
+	for _, category := range ps.Categories {
+		categories = append(categories, db.Category(category))
 	}
 
-	return repomodel.NewPartSearch(categories, filter.Uuids, filter.Names, filter.ManufacturerCountries, filter.Tags)
+	return db.NewPartSearch(categories, ps.Uuids, ps.Names, ps.ManufacturerCountries, ps.Tags)
 }
 
-func RepoModelToModel(part *repomodel.Part) *Part {
+func NewPart(part *db.Part) *Part {
 	var metadata = make(map[string]*Value)
 	if part.Metadata != nil {
 		for key, value := range part.Metadata {

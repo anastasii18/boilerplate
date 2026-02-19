@@ -22,10 +22,10 @@ func NewService(repository db.InventoryRepository) *Service {
 }
 
 func (s Service) GetParts(filter PartSearch) map[string]*Part {
-	parts := s.InventoryRepository.GetParts(FilterToRepoFilter(filter))
+	parts := s.InventoryRepository.GetParts(filter.ToDB())
 	result := make(map[string]*Part)
 	for id, value := range parts {
-		result[id] = RepoModelToModel(value)
+		result[id] = NewPart(value)
 	}
 
 	return result
@@ -37,5 +37,5 @@ func (s Service) GetPart(id string) (*Part, error) {
 		return nil, err
 	}
 
-	return RepoModelToModel(part), nil
+	return NewPart(part), nil
 }
