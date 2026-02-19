@@ -4,11 +4,10 @@ import (
 	"context"
 	"log"
 	"payment/pkg/repository"
-	paymentV1 "shared/pkg/proto/payment/v1"
 )
 
 type PaymentService interface {
-	PayOrder(context.Context, *paymentV1.PayOrderRequest) (*paymentV1.PayOrderResponse, error)
+	PayOrder(context.Context) string
 }
 
 var _ PaymentService = (*Service)(nil)
@@ -23,8 +22,8 @@ func NewService(paymentRepository repository.PaymentRepository) *Service {
 	}
 }
 
-func (service *Service) PayOrder(context.Context, *paymentV1.PayOrderRequest) (*paymentV1.PayOrderResponse, error) {
+func (service *Service) PayOrder(context.Context) string {
 	transactionUuid := service.paymentRepository.PayOrder()
 	log.Printf("Оплата прошла успешно, transaction_uuid: %s\n", transactionUuid)
-	return &paymentV1.PayOrderResponse{TransactionUuid: transactionUuid}, nil
+	return transactionUuid
 }

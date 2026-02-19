@@ -18,5 +18,5 @@ func NewApi(paymentService service.PaymentService) *Api {
 }
 
 func (service *Api) PayOrder(ctx context.Context, request *paymentV1.PayOrderRequest) (*paymentV1.PayOrderResponse, error) {
-	return service.paymentService.PayOrder(ctx, request)
+	return &paymentV1.PayOrderResponse{TransactionUuid: service.paymentService.PayOrder(ctx)}, nil
 }
