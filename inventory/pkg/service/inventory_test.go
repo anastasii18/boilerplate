@@ -1,18 +1,18 @@
 package service
 
 import (
-	"inventory/pkg/model"
-	"inventory/pkg/repository"
+	"inventory/pkg/db"
 	"reflect"
 	"testing"
 )
 
 func TestGetPart(t *testing.T) {
 	s := Service{
-		InventoryRepository: repository.NewRepository(),
+		InventoryRepository: db.NewRepository().Seed(),
 	}
 	oneId := "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-	one, _ := s.InventoryRepository.GetPart(oneId)
+	onet, _ := s.InventoryRepository.GetPart(oneId)
+	one := NewPart(onet)
 
 	type args struct {
 		id string
@@ -20,7 +20,7 @@ func TestGetPart(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *model.Part
+		want    *Part
 		wantErr bool
 	}{
 		{
@@ -53,57 +53,60 @@ func TestGetPart(t *testing.T) {
 
 func TestGetParts(t *testing.T) {
 	s := Service{
-		InventoryRepository: repository.NewRepository(),
+		InventoryRepository: db.NewRepository().Seed(),
 	}
 	oneId := "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-	one, _ := s.InventoryRepository.GetPart(oneId)
+	onet, _ := s.InventoryRepository.GetPart(oneId)
+	one := NewPart(onet)
 	twoId := "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
-	two, _ := s.InventoryRepository.GetPart(twoId)
+	twot, _ := s.InventoryRepository.GetPart(twoId)
+	two := NewPart(twot)
 	threeId := "29a9ab94-c814-4828-9a02-b96598dbe299"
-	three, _ := s.InventoryRepository.GetPart(threeId)
+	threet, _ := s.InventoryRepository.GetPart(threeId)
+	three := NewPart(threet)
 
 	type args struct {
-		filter model.Filter
+		filter PartSearch
 	}
 	tests := []struct {
 		name string
 		args args
-		want map[string]*model.Part
+		want map[string]*Part
 	}{
 		{
 			name: "Get parts for categories",
-			args: args{model.NewFilter([]model.Category{model.CATEGORY_ENGINE}, nil, nil, nil, nil)},
-			want: map[string]*model.Part{
+			args: args{NewPartSearch([]Category{CATEGORY_ENGINE}, nil, nil, nil, nil)},
+			want: map[string]*Part{
 				twoId:   two,
 				threeId: three,
 			},
 		},
 		{
 			name: "Get parts for ids",
-			args: args{model.NewFilter(nil, []string{"fbb05498-4db6-48c8-b945-3e56f4e5ad04"}, nil, nil, nil)},
-			want: map[string]*model.Part{
+			args: args{NewPartSearch(nil, []string{"fbb05498-4db6-48c8-b945-3e56f4e5ad04"}, nil, nil, nil)},
+			want: map[string]*Part{
 				oneId: one,
 			},
 		},
 		{
 			name: "Get parts for names",
-			args: args{model.NewFilter(nil, nil, []string{"two two"}, nil, nil)},
-			want: map[string]*model.Part{
+			args: args{NewPartSearch(nil, nil, []string{"two two"}, nil, nil)},
+			want: map[string]*Part{
 				twoId: two,
 			},
 		},
 		{
 			name: "Get parts for countries",
-			args: args{model.NewFilter(nil, nil, nil, []string{"Moscow"}, nil)},
-			want: map[string]*model.Part{
+			args: args{NewPartSearch(nil, nil, nil, []string{"Moscow"}, nil)},
+			want: map[string]*Part{
 				oneId:   one,
 				threeId: three,
 			},
 		},
 		{
 			name: "Get parts for tags",
-			args: args{model.NewFilter(nil, nil, nil, nil, []string{"engine", "Moscow"})},
-			want: map[string]*model.Part{
+			args: args{NewPartSearch(nil, nil, nil, nil, []string{"engine", "Moscow"})},
+			want: map[string]*Part{
 				threeId: three,
 			},
 		},

@@ -19,7 +19,8 @@ const (
 )
 
 func main() {
-	a := app.New(&app.Config{Port: httpPort, ReadHeaderTimeout: readHeaderTimeout, ShutdownTimeout: shutdownTimeout}, serverInventoryAddress, serverPaymentAddress)
+	cfg := app.Config{Port: httpPort, ReadHeaderTimeout: readHeaderTimeout, ShutdownTimeout: shutdownTimeout}
+	a := app.New(&cfg, serverInventoryAddress, serverPaymentAddress)
 	a.Start()
 
 	// Graceful shutdown

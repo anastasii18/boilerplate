@@ -1,10 +1,9 @@
-package repository_test
+package db_test
 
 import (
 	"fmt"
-	"order/pkg/model"
-	"order/pkg/repository"
-	repomocks "order/pkg/repository/mocks"
+	"order/pkg/db"
+	repomocks "order/pkg/db/mocks"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
@@ -22,7 +21,7 @@ func TestGetOrder(t *testing.T) {
 		name       string
 		args       args
 		orderMock  mockSetupFunc
-		want       *model.Order
+		want       *db.Order
 		wantErr    bool
 		wantErrMsg string
 	}{
@@ -32,11 +31,11 @@ func TestGetOrder(t *testing.T) {
 				OrderID: gofakeit.UUID(),
 			},
 			orderMock: func(t *testing.T, args args, m *repomocks.OrderRepository) {
-				expectedOrder := &model.Order{
+				expectedOrder := &db.Order{
 					OrderUuid:       args.OrderID,
-					Status:          model.PAID,
+					Status:          db.PAID,
 					TotalPrice:      1499.99,
-					PaymentMethod:   model.CARD,
+					PaymentMethod:   db.CARD,
 					TransactionUuid: "2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc",
 				}
 
@@ -44,10 +43,10 @@ func TestGetOrder(t *testing.T) {
 					Return(expectedOrder, nil).
 					Once()
 			},
-			want: &model.Order{
-				Status:          model.PAID,
+			want: &db.Order{
+				Status:          db.PAID,
 				TotalPrice:      1499.99,
-				PaymentMethod:   model.CARD,
+				PaymentMethod:   db.CARD,
 				TransactionUuid: "2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc",
 			},
 			wantErr: false,
@@ -107,7 +106,7 @@ func TestGetOrder(t *testing.T) {
 
 func TestCreateOrder(t *testing.T) {
 	type args struct {
-		order *repository.Order
+		order *db.Order
 	}
 	type mockSetupFunc func(t *testing.T, args args, m *repomocks.OrderRepository)
 	tests := []struct {
@@ -117,13 +116,13 @@ func TestCreateOrder(t *testing.T) {
 	}{
 		{
 			name: "Успешное создание заказа",
-			args: args{&repository.Order{OrderUuid: gofakeit.UUID()}},
+			args: args{&db.Order{OrderUuid: gofakeit.UUID()}},
 			orderMock: func(t *testing.T, args args, m *repomocks.OrderRepository) {
 				expectedOrder := args.order
 				m.On("CreateOrder", args.order).
 					Once()
 				m.On("GetOrder", args.order.OrderUuid).
-					Return(repository.OrderToModel(expectedOrder), nil).
+					Return(expectedOrder, nil).
 					Once()
 			},
 		},
