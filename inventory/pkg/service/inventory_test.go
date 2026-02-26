@@ -6,14 +6,20 @@ import (
 	"testing"
 )
 
-func TestGetPart(t *testing.T) {
-	s := Service{
-		InventoryRepository: db.NewRepository().Seed(),
-	}
-	oneId := "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-	onet, _ := s.InventoryRepository.GetPart(oneId)
-	one := NewPart(onet)
+var s = Service{
+	InventoryRepository: db.NewRepository().Seed(),
+}
+var oneId = "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
+var onet, _ = s.InventoryRepository.GetPart(oneId)
+var one = NewPart(onet)
+var twoId = "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
+var twot, _ = s.InventoryRepository.GetPart(twoId)
+var two = NewPart(twot)
+var threeId = "29a9ab94-c814-4828-9a02-b96598dbe299"
+var threet, _ = s.InventoryRepository.GetPart(threeId)
+var three = NewPart(threet)
 
+func TestGetPart(t *testing.T) {
 	type args struct {
 		id string
 	}
@@ -52,19 +58,6 @@ func TestGetPart(t *testing.T) {
 }
 
 func TestGetParts(t *testing.T) {
-	s := Service{
-		InventoryRepository: db.NewRepository().Seed(),
-	}
-	oneId := "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-	onet, _ := s.InventoryRepository.GetPart(oneId)
-	one := NewPart(onet)
-	twoId := "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
-	twot, _ := s.InventoryRepository.GetPart(twoId)
-	two := NewPart(twot)
-	threeId := "29a9ab94-c814-4828-9a02-b96598dbe299"
-	threet, _ := s.InventoryRepository.GetPart(threeId)
-	three := NewPart(threet)
-
 	type args struct {
 		filter PartSearch
 	}

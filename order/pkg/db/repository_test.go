@@ -147,3 +147,92 @@ func TestCreateOrder(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateOrder(t *testing.T) {
+	type args struct {
+		orderUuid       string
+		transactionUuid *string
+		status          *db.OrderStatus
+		paymentMethod   *db.OrderPaymentMethod
+	}
+	type mockSetupFunc func(t *testing.T, args args, m *repomocks.OrderRepository)
+	tests := []struct {
+		name      string
+		args      args
+		orderMock mockSetupFunc
+		wantErr   bool
+	}{
+		{
+			name: "Успешное обновление",
+			args: args{orderUuid: gofakeit.UUID(), transactionUuid: Ptr(gofakeit.UUID()), status: Ptr(db.CANCELLED), paymentMethod: Ptr(db.CREDIT_CARD)},
+			orderMock: func(t *testing.T, args args, m *repomocks.OrderRepository) {
+				m.On("UpdateOrder", args.orderUuid, args.transactionUuid, args.status, args.paymentMethod).
+					Return(nil).
+					Once()
+				expectedOrder := &db.Order{
+					OrderUuid:       args.orderUuid,
+					Status:          Val(args.status),
+					PaymentMethod:   Val(args.paymentMethod),
+					TransactionUuid: Val(args.transactionUuid),
+				}
+				m.On("GetOrder", args.orderUuid).
+					Return(expectedOrder, nil).
+					Once()
+			},
+			wantErr: false,
+		},
+		{
+			name: "Ошибка обновления",
+			args: args{orderUuid: gofakeit.UUID(), transactionUuid: Ptr(gofakeit.UUID()), status: Ptr(db.CANCELLED), paymentMethod: Ptr(db.CREDIT_CARD)},
+			orderMock: func(t *testing.T, args args, m *repomocks.OrderRepository) {
+				m.On("UpdateOrder", args.orderUuid, args.transactionUuid, args.status, args.paymentMethod).
+					Return(fmt.Errorf("no return value specified for UpdateOrder")).
+					Once()
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoMock := repomocks.NewOrderRepository(t)
+
+			tt.orderMock(t, tt.args, repoMock)
+
+			err := repoMock.UpdateOrder(tt.args.orderUuid, tt.args.transactionUuid, tt.args.status, tt.args.paymentMethod)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				got, err := repoMock.GetOrder(tt.args.orderUuid)
+				if got == nil {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+
+					require.Equal(t, Val(tt.args.status), got.Status)
+					require.Equal(t, Val(tt.args.paymentMethod), got.PaymentMethod)
+					require.Equal(t, Val(tt.args.transactionUuid), got.TransactionUuid)
+					require.Equal(t, tt.args.orderUuid, got.OrderUuid)
+				}
+			}
+
+			repoMock.AssertExpectations(t)
+		})
+	}
+}
+
+func Ptr[T comparable](t T) *T {
+	var def T
+	if t == def {
+		return nil
+	}
+	return &t
+}
+
+func Val[T any, P *T](p P) T {
+	if p != nil {
+		return *p
+	}
+	var def T
+	return def
+}

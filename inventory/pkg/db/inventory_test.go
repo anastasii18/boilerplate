@@ -5,17 +5,15 @@ import (
 	"testing"
 )
 
+var r = NewRepository().Seed()
+var oneId = "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
+var one = r.data[oneId]
+var twoId = "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
+var two = r.data[twoId]
+var threeId = "29a9ab94-c814-4828-9a02-b96598dbe299"
+var three = r.data[threeId]
+
 func TestGetParts(t *testing.T) {
-	r := NewRepository()
-	r.Seed()
-
-	oneId := "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-	one := r.data[oneId]
-	twoId := "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
-	two := r.data[twoId]
-	threeId := "29a9ab94-c814-4828-9a02-b96598dbe299"
-	three := r.data[threeId]
-
 	type args struct {
 		filter PartSearch
 	}
@@ -74,12 +72,6 @@ func TestGetParts(t *testing.T) {
 }
 
 func TestGetPart(t *testing.T) {
-	r := NewRepository()
-	r.Seed()
-
-	oneId := "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-	one := r.data[oneId]
-
 	type args struct {
 		id string
 	}

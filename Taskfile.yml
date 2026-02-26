@@ -14,6 +14,8 @@ vars:
   GOFUMPT: '{{.BIN_DIR}}/gofumpt'
   MODULES: assembly inventory order payment platform iam notification
   MOCKERY: "{{.BIN_DIR}}/mockery"
+  COVERAGE_DIR: '{{.ROOT_DIR}}/coverage'
+  COVERAGE_FILE: total.out
 
 tasks:
   install-formatters:
@@ -117,3 +119,92 @@ tasks:
         }
     status:
       - test -x {{.MOCKERY}}
+
+  test-coverage:
+    desc: "Тесты с покрытием бизнес-логики (service/repository), отчёт по каждому модулю + общий"
+    cmds:
+      - |
+        echo "🧪 Запускаем расчёт покрытия..."
+        rm -rf {{.COVERAGE_DIR}}
+        mkdir -p {{.COVERAGE_DIR}}
+
+        ERR=0
+        for mod in {{.MODULES}}; do
+          echo "📦 Обрабатываем модуль: $mod"
+
+          TARGET_PKGS=$(go list ./$mod/... \
+            | grep -E '/(pkg/(service|db|repository))' \
+            | grep -vE '/(mocks|testdata|api|proto|pb|cmd)' \
+            | paste -sd "," -)
+
+          if [ -z "$TARGET_PKGS" ]; then
+            echo "⚠️  Нет подходящих пакетов в $mod"
+            continue
+          fi
+
+          go test -coverpkg="$TARGET_PKGS" \
+            -coverprofile={{.COVERAGE_DIR}}/$mod.out \
+            -covermode=atomic \
+            $(echo "$TARGET_PKGS" | tr "," " ") || ERR=1
+        done
+
+        if [ $ERR -ne 0 ]; then
+          echo "❌ Ошибки во время тестов"
+          exit $ERR
+        fi
+
+        echo
+        echo "📊 Покрытие по каждому модулю:"
+        for mod in {{.MODULES}}; do
+          OUTFILE="{{.COVERAGE_DIR}}/$mod.out"
+          if [ -f "$OUTFILE" ]; then
+            printf " • %s: " "$mod"
+            go tool cover -func="$OUTFILE" | tail -n1
+          fi
+        done
+
+        echo
+        echo "📦 Склеиваем все покрытия..."
+        {
+          echo "mode: atomic"
+          find {{.COVERAGE_DIR}} -type f -name '*.out' ! -name '{{.COVERAGE_FILE}}' \
+            -exec grep -h -v "^mode:" {} +
+        } > {{.COVERAGE_DIR}}/{{.COVERAGE_FILE}}
+
+        echo
+        echo "🧾 Общее покрытие по всем модулям:"
+        go tool cover -func={{.COVERAGE_DIR}}/{{.COVERAGE_FILE}} | tail -n1
+
+  coverage:html:
+    desc: "Генерирует HTML-отчёт покрытия и открывает его в браузере"
+    deps: [ test-coverage ]
+    cmds:
+      - |
+        OUTPUT={{.COVERAGE_DIR}}/coverage.html
+        echo "🌐 Генерируем HTML-отчёт..."
+        go tool cover -html={{.COVERAGE_DIR}}/{{.COVERAGE_FILE}} -o $OUTPUT
+
+        echo "🚀 Открываем $OUTPUT"
+        if command -v open &> /dev/null; then
+          open $OUTPUT  # macOS
+        elif command -v xdg-open &> /dev/null; then
+          xdg-open $OUTPUT  # Linux
+        else
+          echo "📂 Отчёт сохранён в $OUTPUT (открой вручную)"
+        fi
+
+  test:
+    desc: "Запускает юнит-тесты для всех модулей"
+    summary: |
+      Запускает юнит-тесты для указанных модулей проекта.
+      Можно указать конкретные модули через переменную MODULES.
+    cmds:
+      - |
+        ERR=0
+        for mod in {{.MODULES}}; do
+          if [ -d "$mod" ]; then
+            echo "🧪 Тестируем модуль $mod"
+            go test -v ./$mod/... || ERR=1
+          fi
+        done
+        exit $ERR
