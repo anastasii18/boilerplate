@@ -5,6 +5,7 @@ import (
 	"fmt"
 	inventoryModel "inventory/pkg/service"
 	"order/pkg/db"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -38,6 +39,7 @@ func (s Service) CreateOrder(ctx context.Context, order *Order, parts []*invento
 		totalPrice += part.Price
 	}
 
+	order.CreatedAt = time.Now()
 	order.TotalPrice = totalPrice
 	order.OrderUuid = uuid.New().String()
 	order.Status = PENDING_PAYMENT

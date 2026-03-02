@@ -1,0 +1,13 @@
+#описание общей сети
+services:
+  placeholder:
+    image: alpine
+    command:
+      ["sh", "-c", "echo 'This is a placeholder service' && sleep infinity"]
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: app-network
+    external: false

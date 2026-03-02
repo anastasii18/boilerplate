@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type Order struct {
@@ -11,9 +12,11 @@ type Order struct {
 	UserUuid        string             `json:"user_uuid"`
 	PartUuids       []string           `json:"part_uuids"`
 	TotalPrice      float64            `json:"total_price"`
-	TransactionUuid string             `json:"transaction_uuid"`
+	TransactionUuid *string            `json:"transaction_uuid"`
 	PaymentMethod   OrderPaymentMethod `json:"payment_method"`
 	Status          OrderStatus        `json:"status"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       *time.Time         `json:"updated_at"`
 }
 
 type OrderStatus int32
