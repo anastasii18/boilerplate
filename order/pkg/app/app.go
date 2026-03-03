@@ -18,10 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -39,18 +36,18 @@ type App struct {
 	PaymentClient   payment.Client
 }
 
-func New(config *Config, serverInventoryAddress, serverPaymentAddress string, pool *pgxpool.Pool) *App {
-	storage := db.NewRepository(pool)
+func New(ctx context.Context, config *Config, serverInventoryAddress, serverPaymentAddress string, database *db.DB) *App {
+	storage := db.NewRepository(database)
 	a := &App{Config: config, Storage: storage, OrderService: service.NewService(storage)}
 
 	a.InventoryClient, _ = inventory.NewClient(serverInventoryAddress)
 	a.PaymentClient, _ = payment.NewClient(serverPaymentAddress)
-	a.createServer(a.createRouter())
+	a.createServer(a.createRouter(ctx))
 
 	return a
 }
 
-func (app *App) createRouter() *chi.Mux {
+func (app *App) createRouter(ctx context.Context) *chi.Mux {
 	// Инициализируем роутер Chi
 	r := chi.NewRouter()
 
@@ -64,13 +61,13 @@ func (app *App) createRouter() *chi.Mux {
 	// Определяем маршруты
 	r.Route("/api/v1/orders", func(r chi.Router) {
 		// Получить заказ по UUID
-		r.Get("/{order_uuid}", a.GetOrderHandler())
+		r.Get("/{order_uuid}", a.GetOrderHandler(ctx))
 		// Создание заказа
-		r.Post("/", a.CreateOrderHandler(app.InventoryClient))
+		r.Post("/", a.CreateOrderHandler(ctx, app.InventoryClient))
 		// Оплата заказа
-		r.Post("/{order_uuid}/pay", a.PayOrderHandler(app.PaymentClient))
+		r.Post("/{order_uuid}/pay", a.PayOrderHandler(ctx, app.PaymentClient))
 		// Отменить заказ
-		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler())
+		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler(ctx))
 	})
 
 	return r
@@ -100,39 +97,15 @@ func (a *App) Start() {
 }
 
 func (a *App) Migrate(ctx context.Context) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Printf("failed to load .env file: %v\n", err)
-		return
-	}
-
-	dbURI := os.Getenv("DB_URI")
-
-	// Создаем соединение с базой данных
-	con, err := pgx.Connect(ctx, dbURI)
-	if err != nil {
-		log.Printf("failed to connect to database: %v\n", err)
-		return
-	}
-	defer func() {
-		cerr := con.Close(ctx)
-		if cerr != nil {
-			log.Printf("failed to close connection: %v\n", cerr)
-		}
-	}()
-
-	// Проверяем, что соединение с базой установлено
-	err = con.Ping(ctx)
-	if err != nil {
-		log.Printf("База данных недоступна: %v\n", err)
-		return
-	}
-
 	// Инициализируем мигратор
 	migrationsDir := os.Getenv("MIGRATIONS_DIR")
-	migratorRunner := migrator.NewMigrator(stdlib.OpenDB(*con.Config().Copy()), migrationsDir)
 
-	err = migratorRunner.Up()
+	dbConfig := a.Storage.DB.Pool.Config().ConnConfig
+	sqlDB := stdlib.OpenDB(*dbConfig)
+
+	migratorRunner := migrator.NewMigrator(sqlDB, migrationsDir)
+
+	err := migratorRunner.Up()
 	if err != nil {
 		log.Printf("Ошибка миграции базы данных: %v\n", err)
 		return

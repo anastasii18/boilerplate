@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	inventoryModel "inventory/pkg/service"
@@ -27,7 +28,7 @@ func New(service service.OrderService) *Api {
 }
 
 // Создаёт новый заказ на основе выбранных пользователем деталей.
-func (a *Api) CreateOrderHandler(inventoryClient inventory.Client) http.HandlerFunc {
+func (a *Api) CreateOrderHandler(ctx context.Context, inventoryClient inventory.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Декодируем данные из тела запроса
 		var orderCreate service.Order
@@ -35,7 +36,6 @@ func (a *Api) CreateOrderHandler(inventoryClient inventory.Client) http.HandlerF
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		ctx := r.Context()
 		var newParts []*inventoryModel.Part
 
 		if orderCreate.PartUuids != nil {
@@ -67,7 +67,7 @@ func (a *Api) CreateOrderHandler(inventoryClient inventory.Client) http.HandlerF
 }
 
 // Возвращает информацию о заказе
-func (a *Api) GetOrderHandler() http.HandlerFunc {
+func (a *Api) GetOrderHandler(ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		orderId := chi.URLParam(r, urlParam)
 		if orderId == "" {
@@ -75,7 +75,7 @@ func (a *Api) GetOrderHandler() http.HandlerFunc {
 			return
 		}
 
-		orderData, err := a.orderService.GetOrder(orderId)
+		orderData, err := a.orderService.GetOrder(ctx, orderId)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Order with ID '%s' not found", orderId), http.StatusNotFound)
 			return
@@ -86,7 +86,7 @@ func (a *Api) GetOrderHandler() http.HandlerFunc {
 }
 
 // Проводит оплату ранее созданного заказа.
-func (a *Api) PayOrderHandler(paymentClient payment.Client) http.HandlerFunc {
+func (a *Api) PayOrderHandler(ctx context.Context, paymentClient payment.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		orderId := chi.URLParam(r, urlParam)
 		if orderId == "" {
@@ -94,7 +94,7 @@ func (a *Api) PayOrderHandler(paymentClient payment.Client) http.HandlerFunc {
 			return
 		}
 
-		orderData, err := a.orderService.GetOrder(orderId)
+		orderData, err := a.orderService.GetOrder(ctx, orderId)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Order with ID '%s' not found", orderId), http.StatusNotFound)
 			return
@@ -107,14 +107,13 @@ func (a *Api) PayOrderHandler(paymentClient payment.Client) http.HandlerFunc {
 			return
 		}
 
-		ctx := r.Context()
 		payOrderResponse, err := paymentClient.PayOrder(ctx, orderId, orderData.UserUuid, payBody.PaymentMethod)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		err = a.orderService.UpdateOrder(orderId, Ptr(payOrderResponse.GetTransactionUuid()), Ptr(service.PAID), Ptr(service.OrderPaymentMethod(payBody.PaymentMethod)))
+		err = a.orderService.UpdateOrder(ctx, orderId, Ptr(payOrderResponse.GetTransactionUuid()), Ptr(service.PAID), Ptr(service.OrderPaymentMethod(payBody.PaymentMethod)))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -125,7 +124,7 @@ func (a *Api) PayOrderHandler(paymentClient payment.Client) http.HandlerFunc {
 }
 
 // Отменяет заказ
-func (a *Api) CancelOrderHandler() http.HandlerFunc {
+func (a *Api) CancelOrderHandler(ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		orderId := chi.URLParam(r, urlParam)
 		if orderId == "" {
@@ -133,7 +132,7 @@ func (a *Api) CancelOrderHandler() http.HandlerFunc {
 			return
 		}
 
-		orderData, err := a.orderService.GetOrder(orderId)
+		orderData, err := a.orderService.GetOrder(ctx, orderId)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Order with ID '%s' not found.", orderId), http.StatusNotFound)
 			return
@@ -149,7 +148,7 @@ func (a *Api) CancelOrderHandler() http.HandlerFunc {
 			return
 		}
 
-		err = a.orderService.UpdateOrder(orderId, nil, Ptr(service.CANCELLED), nil)
+		err = a.orderService.UpdateOrder(ctx, orderId, nil, Ptr(service.CANCELLED), nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

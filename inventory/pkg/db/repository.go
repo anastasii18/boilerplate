@@ -12,29 +12,33 @@ import (
 )
 
 type InventoryRepository interface {
-	GetParts(filter PartSearch) map[string]*Part
-	GetPart(id string) (*Part, error)
+	GetParts(ctx context.Context, filter PartSearch) (map[string]*Part, error)
+	GetPart(ctx context.Context, id string) (*Part, error)
 }
 
 type Repository struct {
-	mu   sync.RWMutex
-	data *mongo.Collection
+	mu sync.RWMutex
+	DB *DB
 }
 
 var _ InventoryRepository = (*Repository)(nil)
 
-func NewRepository(collection *mongo.Collection) *Repository {
+func NewRepository(db *DB) *Repository {
 	return &Repository{
-		data: collection,
+		DB: db,
 	}
 }
 
+type DB struct {
+	MongoClient     *mongo.Client
+	MongoCollection *mongo.Collection
+}
+
 // Seed наполняет базу тестовыми данными
-func (r *Repository) Seed() *Repository {
+func (r *Repository) Seed(ctx context.Context) *Repository {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	now := time.Now()
-	ctx := context.Background()
 
 	parts := []Part{
 		{
@@ -109,7 +113,7 @@ func (r *Repository) Seed() *Repository {
 	insertedCount := 0
 	for _, part := range parts {
 		filter := bson.M{"uuid": part.Uuid}
-		count, err := r.data.CountDocuments(ctx, filter)
+		count, err := r.DB.MongoCollection.CountDocuments(ctx, filter)
 		if err != nil {
 			log.Printf("Ошибка проверки uuid %s: %v", part.Uuid, err)
 			continue
@@ -119,7 +123,7 @@ func (r *Repository) Seed() *Repository {
 			continue
 		}
 
-		_, err = r.data.InsertOne(ctx, part)
+		_, err = r.DB.MongoCollection.InsertOne(ctx, part)
 		if err != nil {
 			log.Printf("Ошибка вставки uuid %s: %v", part.Uuid, err)
 			continue
@@ -132,10 +136,35 @@ func (r *Repository) Seed() *Repository {
 	return r
 }
 
-func (r *Repository) GetParts(filter PartSearch) map[string]*Part {
+func (r *Repository) GetParts(ctx context.Context, filter PartSearch) (map[string]*Part, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	ctx := context.Background()
+
+	cursor, err := r.DB.MongoCollection.Find(ctx, NewMongoFilter(filter))
+	if err != nil {
+		return nil, fmt.Errorf("ошибка Find: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	// Собираем результат в map
+	result := make(map[string]*Part)
+
+	for cursor.Next(ctx) {
+		var part Part
+		if err := cursor.Decode(&part); err != nil {
+			return nil, fmt.Errorf("Ошибка декодирования: %v", err)
+		}
+		result[part.Uuid] = &part
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка курсора: %w", err)
+	}
+
+	return result, nil
+}
+
+func NewMongoFilter(filter PartSearch) bson.M {
 	mongoFilter := bson.M{}
 
 	if filter.Uuids != nil {
@@ -158,39 +187,15 @@ func (r *Repository) GetParts(filter PartSearch) map[string]*Part {
 		mongoFilter["tags"] = bson.M{"$all": filter.Tags}
 	}
 
-	cursor, err := r.data.Find(ctx, mongoFilter)
-	if err != nil {
-		log.Printf("ошибка Find: %w", err)
-		return nil
-	}
-	defer cursor.Close(ctx)
-
-	// Собираем результат в map
-	result := make(map[string]*Part)
-
-	for cursor.Next(ctx) {
-		var part Part
-		if err := cursor.Decode(&part); err != nil {
-			log.Printf("Ошибка декодирования: %v", err)
-			continue
-		}
-		result[part.Uuid] = &part
-	}
-
-	if err := cursor.Err(); err != nil {
-		log.Printf("ошибка курсора: %w", err)
-		return nil
-	}
-
-	return result
+	return mongoFilter
 }
 
-func (r *Repository) GetPart(id string) (*Part, error) {
+func (r *Repository) GetPart(ctx context.Context, id string) (*Part, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	var part Part
-	err := r.data.FindOne(context.Background(), bson.M{"uuid": id}).Decode(&part)
+	err := r.DB.MongoCollection.FindOne(ctx, bson.M{"uuid": id}).Decode(&part)
 	if err != nil {
 		return nil, fmt.Errorf("part with id %s not found", id)
 	}

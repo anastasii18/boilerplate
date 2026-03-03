@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -15,29 +16,41 @@ import (
 )
 
 type OrderRepository interface {
-	CreateOrder(order *Order)
-	GetOrder(orderUuid string) (*Order, error)
-	UpdateOrder(orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
+	CreateOrder(ctx context.Context, order *Order) error
+	GetOrder(ctx context.Context, orderUuid string) (*Order, error)
+	UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
 }
 
 type Repository struct {
 	mu sync.RWMutex
-	db DB
+	DB *DB
 }
 
 type DB struct {
-	pool *pgxpool.Pool
+	*pgxpool.Pool
+}
+
+func NewDB(ctx context.Context) (*DB, error) {
+	dbURI := os.Getenv("DB_URI")
+
+	// Создаем пул соединений с базой данных
+	pool, err := pgxpool.New(ctx, dbURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %v\n", err)
+	}
+	log.Printf("Connecting to database with URI: %s", dbURI)
+	return &DB{pool}, nil
 }
 
 var _ OrderRepository = (*Repository)(nil)
 
-func NewRepository(pool *pgxpool.Pool) *Repository {
+func NewRepository(database *DB) *Repository {
 	return &Repository{
-		db: DB{pool: pool},
+		DB: database,
 	}
 }
 
-func (r *Repository) CreateOrder(order *Order) {
+func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -52,20 +65,22 @@ func (r *Repository) CreateOrder(order *Order) {
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
 		log.Printf("failed to build query: %v\n", err)
-		return
+		return err
 	}
 
 	var orderId string
-	err = r.db.pool.QueryRow(context.Background(), query, args...).Scan(&orderId)
+	err = r.DB.QueryRow(ctx, query, args...).Scan(&orderId)
 	if err != nil {
 		log.Printf("failed to insert note: %v\n", err)
-		return
+		return err
 	}
 
 	log.Printf("inserted note with id: %s\n", orderId)
+
+	return nil
 }
 
-func (r *Repository) GetOrder(orderUuid string) (*Order, error) {
+func (r *Repository) GetOrder(ctx context.Context, orderUuid string) (*Order, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	builderSelect := sq.Select("*").
@@ -79,7 +94,7 @@ func (r *Repository) GetOrder(orderUuid string) (*Order, error) {
 		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
 
-	row, err := r.db.pool.Query(context.Background(), query, args...)
+	row, err := r.DB.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -96,10 +111,10 @@ func (r *Repository) GetOrder(orderUuid string) (*Order, error) {
 	return &order, nil
 }
 
-func (r *Repository) UpdateOrder(orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
+func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	_, ok := r.GetOrder(orderUuid)
+	_, ok := r.GetOrder(ctx, orderUuid)
 
 	if ok != nil {
 		return fmt.Errorf("order with id %s not found", orderUuid)
@@ -107,7 +122,8 @@ func (r *Repository) UpdateOrder(orderUuid string, transactionUuid *string, stat
 
 	builderUpdate := sq.Update("\"order\"").
 		PlaceholderFormat(sq.Dollar).
-		Set("updated_at", time.Now())
+		Set("updated_at", time.Now()).
+		Where(sq.Eq{"order_uuid": orderUuid})
 
 	if transactionUuid != nil {
 		builderUpdate = builderUpdate.Set("transaction_uuid", *transactionUuid)
@@ -121,14 +137,13 @@ func (r *Repository) UpdateOrder(orderUuid string, transactionUuid *string, stat
 		builderUpdate = builderUpdate.Set("payment_method", paymentMethod.String())
 	}
 
-	builderUpdate = builderUpdate.Where(sq.Eq{"order_uuid": orderUuid})
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
 		log.Printf("failed to build query: %v\n", err)
 		return fmt.Errorf("failed to build query: %v\n", err)
 	}
 
-	res, err := r.db.pool.Exec(context.Background(), query, args...)
+	res, err := r.DB.Exec(ctx, query, args...)
 	if err != nil {
 		log.Printf("failed to update order: %v\n", err)
 		return fmt.Errorf("failed to update order: %v\n", err)

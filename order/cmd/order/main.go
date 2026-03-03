@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"order/pkg/app"
+	"order/pkg/db"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -24,17 +23,18 @@ const (
 )
 
 func main() {
+	ctx := context.Background()
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Printf("failed to load .env file: %v\n", err)
 		return
 	}
 	cfg := app.Config{Port: httpPort, ReadHeaderTimeout: readHeaderTimeout, ShutdownTimeout: shutdownTimeout}
-	pool, err := dbInit()
+	database, err := db.NewDB(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := app.New(&cfg, serverInventoryAddress, serverPaymentAddress, pool)
+	a := app.New(ctx, &cfg, serverInventoryAddress, serverPaymentAddress, database)
 	a.Start()
 	a.Migrate(context.Background())
 
@@ -46,16 +46,4 @@ func main() {
 	log.Println("🛑 Завершение работы сервера...")
 
 	a.Stop()
-}
-
-func dbInit() (*pgxpool.Pool, error) {
-	dbURI := os.Getenv("DB_URI")
-
-	// Создаем пул соединений с базой данных
-	pool, err := pgxpool.New(context.Background(), dbURI)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v\n", err)
-	}
-	log.Printf("Connecting to database with URI: %s", dbURI)
-	return pool, nil
 }

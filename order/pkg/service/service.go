@@ -12,18 +12,18 @@ import (
 
 type OrderService interface {
 	CreateOrder(ctx context.Context, order *Order, newParts []*inventoryModel.Part) error
-	GetOrder(orderUuid string) (*Order, error)
-	UpdateOrder(orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
+	GetOrder(ctx context.Context, orderUuid string) (*Order, error)
+	UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
 }
 
 var _ OrderService = (*Service)(nil)
 
 type Service struct {
-	OrderRepository db.OrderRepository
+	repo db.OrderRepository
 }
 
 func NewService(orderRepository db.OrderRepository) *Service {
-	return &Service{OrderRepository: orderRepository}
+	return &Service{repo: orderRepository}
 }
 
 func (s Service) CreateOrder(ctx context.Context, order *Order, parts []*inventoryModel.Part) error {
@@ -47,19 +47,22 @@ func (s Service) CreateOrder(ctx context.Context, order *Order, parts []*invento
 	order.OrderUuid = uuid.New().String()
 	order.Status = PENDING_PAYMENT
 
-	s.OrderRepository.CreateOrder(OrderToRepoModel(order))
+	err := s.repo.CreateOrder(ctx, OrderToRepoModel(order))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (s Service) GetOrder(orderUuid string) (*Order, error) {
-	order, err := s.OrderRepository.GetOrder(orderUuid)
+func (s Service) GetOrder(ctx context.Context, orderUuid string) (*Order, error) {
+	order, err := s.repo.GetOrder(ctx, orderUuid)
 	if err != nil {
 		return nil, err
 	}
 	return RepoModelToOrder(order), nil
 }
 
-func (s Service) UpdateOrder(orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
-	return s.OrderRepository.UpdateOrder(orderUuid, transactionUuid, StatusToRepoStatus(status), PaymentMethodToRepoPaymentMethod(paymentMethod))
+func (s Service) UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
+	return s.repo.UpdateOrder(ctx, orderUuid, transactionUuid, StatusToRepoStatus(status), PaymentMethodToRepoPaymentMethod(paymentMethod))
 }

@@ -20,7 +20,7 @@ func New(service service.InventoryService) *Api {
 
 // Возвращает информацию о детали по её UUID
 func (a *Api) GetPart(ctx context.Context, req *inventoryV1.GetPartRequest) (*inventoryV1.GetPartResponse, error) {
-	part, ok := a.inventoryService.GetPart(req.GetUuid())
+	part, ok := a.inventoryService.GetPart(ctx, req.GetUuid())
 
 	return &inventoryV1.GetPartResponse{
 		Part: NewPart(part),
@@ -29,7 +29,10 @@ func (a *Api) GetPart(ctx context.Context, req *inventoryV1.GetPartRequest) (*in
 
 // Возвращает список деталей с возможностью фильтрации
 func (a *Api) GetListParts(ctx context.Context, req *inventoryV1.GetListPartsRequest) (*inventoryV1.GetListPartsResponse, error) {
-	parts := a.inventoryService.GetParts(NewPartSearch(req.GetFilter()))
+	parts, err := a.inventoryService.GetParts(ctx, NewPartSearch(req.GetFilter()))
+	if err != nil {
+		return nil, err
+	}
 	var result []*inventoryV1.Part
 	for _, part := range parts {
 		result = append(result, NewPart(part))

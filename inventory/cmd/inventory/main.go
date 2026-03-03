@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"inventory/pkg/app"
+	"inventory/pkg/db"
 	"log"
 	"os"
 	"os/signal"
@@ -19,12 +21,16 @@ import (
 const grpcPort = 50051
 
 func main() {
-	mongoClient, err := mongoInit()
+	seed := flag.Bool("seed", false, "заполнить тестовыми данными")
+	initIndexes := flag.Bool("init-indexes", false, "создать/обновить индексы в MongoDB")
+	flag.Parse()
+	ctx := context.Background()
+	mongoDB, err := mongoInit(ctx, initIndexes)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Регистрируем наш сервис
-	a := app.New(grpcPort, mongoClient)
+	a := app.New(ctx, grpcPort, mongoDB, seed)
 	a.Start()
 
 	// Graceful shutdown
@@ -37,7 +43,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := a.MongoClient.Disconnect(ctx); err != nil {
+	if err := mongoDB.MongoClient.Disconnect(ctx); err != nil {
 		log.Printf("⚠️ Ошибка при отключении MongoDB: %v", err)
 	} else {
 		log.Println("✅ MongoDB disconnected")
@@ -46,7 +52,7 @@ func main() {
 	log.Println("✅ Server stopped")
 }
 
-func mongoInit() (*mongo.Client, error) {
+func mongoInit(ctx context.Context, initIndexes *bool) (*db.DB, error) {
 	if err := godotenv.Load(); err != nil {
 		log.Printf("failed to load .env: %v", err)
 		// можно не возвращать ошибку, если .env необязателен
@@ -56,8 +62,6 @@ func mongoInit() (*mongo.Client, error) {
 	if uri == "" {
 		return nil, fmt.Errorf("MONGO_URI не задан")
 	}
-
-	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
@@ -75,24 +79,26 @@ func mongoInit() (*mongo.Client, error) {
 
 	dbName := os.Getenv("MONGO_INITDB_DATABASE")
 
-	db := client.Database(dbName)
-	collection := db.Collection("part")
+	database := client.Database(dbName)
+	collection := database.Collection("part")
 
-	// Создание индексов
-	indexModels := []mongo.IndexModel{
-		{
-			Keys:    bson.D{{Key: "uuid", Value: 1}},
-			Options: options.Index().SetUnique(true).SetName("uuid_unique"),
-		},
+	if app.Val(initIndexes) {
+		// Создание индексов
+		indexModels := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "uuid", Value: 1}},
+				Options: options.Index().SetUnique(true).SetName("uuid_unique"),
+			},
+		}
+
+		opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
+		names, err := collection.Indexes().CreateMany(ctx, indexModels, opts)
+		if err != nil {
+			log.Printf("❌ Ошибка создания индекса uuid_unique: %v", err)
+		} else {
+			log.Printf("✅ Индексы созданы: %v", names)
+		}
 	}
 
-	opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
-	names, err := collection.Indexes().CreateMany(ctx, indexModels, opts)
-	if err != nil {
-		log.Printf("❌ Ошибка создания индекса uuid_unique: %v", err)
-	} else {
-		log.Printf("✅ Индексы созданы: %v", names)
-	}
-
-	return client, nil
+	return &db.DB{MongoClient: client, MongoCollection: collection}, nil
 }
