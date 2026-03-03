@@ -27,17 +27,16 @@ type App struct {
 	MongoClient      *mongo.Client
 }
 
-func New(port int) (*App, error) {
-	a := &App{Config: &Config{Port: port}, Server: grpc.NewServer()}
-	var err error
-	a.repository, a.MongoClient, err = db.NewRepoWithMongo()
-	a.repository.Seed()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create repository: %v\n", err)
-	}
+func New(port int, mongoClient *mongo.Client) *App {
+	a := &App{Config: &Config{Port: port}, Server: grpc.NewServer(), MongoClient: mongoClient}
+	a.repository = db.NewRepository(mongoClient.Database("inventory").Collection("part"))
+
+	// Раскомментировать, если нужно заполнить inventory значениями
+	//a.repository.Seed()
+
 	a.inventoryService = service.NewService(a.repository)
 
-	return a, nil
+	return a
 }
 
 func (a *App) createServer() {

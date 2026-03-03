@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"log"
-	"os"
 	"sync"
 )
 
@@ -22,25 +21,19 @@ type OrderRepository interface {
 }
 
 type Repository struct {
-	mu   sync.RWMutex
+	mu sync.RWMutex
+	db DB
+}
+
+type DB struct {
 	pool *pgxpool.Pool
 }
 
 var _ OrderRepository = (*Repository)(nil)
 
-func NewRepository() *Repository {
-	dbURI := os.Getenv("DB_URI")
-
-	// Создаем пул соединений с базой данных
-	pool, err := pgxpool.New(context.Background(), dbURI)
-	if err != nil {
-		log.Printf("failed to connect to database: %v\n", err)
-		return &Repository{}
-	}
-	log.Printf("Connecting to database with URI: %s", dbURI)
-
+func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{
-		pool: pool,
+		db: DB{pool: pool},
 	}
 }
 
@@ -63,7 +56,7 @@ func (r *Repository) CreateOrder(order *Order) {
 	}
 
 	var orderId string
-	err = r.pool.QueryRow(context.Background(), query, args...).Scan(&orderId)
+	err = r.db.pool.QueryRow(context.Background(), query, args...).Scan(&orderId)
 	if err != nil {
 		log.Printf("failed to insert note: %v\n", err)
 		return
@@ -75,11 +68,18 @@ func (r *Repository) CreateOrder(order *Order) {
 func (r *Repository) GetOrder(orderUuid string) (*Order, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	builderSelect := sq.Select("*").
+		From("\"order\"").
+		PlaceholderFormat(sq.Dollar).
+		Where(sq.Eq{"order_uuid": orderUuid}).
+		Limit(1)
 
-	row, err := r.pool.Query(context.Background(),
-		`SELECT * FROM "order" WHERE order_uuid = $1 LIMIT 1`,
-		orderUuid,
-	)
+	query, args, err := builderSelect.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	row, err := r.db.pool.Query(context.Background(), query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -128,7 +128,7 @@ func (r *Repository) UpdateOrder(orderUuid string, transactionUuid *string, stat
 		return fmt.Errorf("failed to build query: %v\n", err)
 	}
 
-	res, err := r.pool.Exec(context.Background(), query, args...)
+	res, err := r.db.pool.Exec(context.Background(), query, args...)
 	if err != nil {
 		log.Printf("failed to update order: %v\n", err)
 		return fmt.Errorf("failed to update order: %v\n", err)

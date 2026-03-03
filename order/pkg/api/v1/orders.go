@@ -3,6 +3,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	inventoryModel "inventory/pkg/service"
 	"log"
 	"net/http"
 	"order/pkg/client/inventory"
@@ -35,14 +36,18 @@ func (a *Api) CreateOrderHandler(inventoryClient inventory.Client) http.HandlerF
 			return
 		}
 		ctx := r.Context()
-		parts, err := inventoryClient.GetListParts(ctx, orderCreate.PartUuids)
+		var newParts []*inventoryModel.Part
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if orderCreate.PartUuids != nil {
+			parts, err := inventoryClient.GetListParts(ctx, orderCreate.PartUuids)
+
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			newParts = inventoryClient.GetInventoryParts(parts)
 		}
-		newParts := inventoryClient.GetInventoryParts(parts)
-		err = a.orderService.CreateOrder(ctx, &orderCreate, newParts)
+		err := a.orderService.CreateOrder(ctx, &orderCreate, newParts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

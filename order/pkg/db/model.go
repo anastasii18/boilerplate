@@ -27,6 +27,10 @@ const (
 	CANCELLED       OrderStatus = 2
 )
 
+var STATUS_PENDING_PAYMENT = "PENDING_PAYMENT"
+var STATUS_PAID = "PAID"
+var STATUS_CANCELLED = "CANCELLED"
+
 type OrderPaymentMethod int32
 
 const (
@@ -37,6 +41,12 @@ const (
 	INVESTOR_MONEY OrderPaymentMethod = 4
 )
 
+var PAYMENT_METHOD_UNKNOWN = "UNKNOWN"
+var PAYMENT_METHOD_CARD = "CARD"
+var PAYMENT_METHOD_SBP = "SBP"
+var PAYMENT_METHOD_CREDIT_CARD = "CREDIT_CARD"
+var PAYMENT_METHOD_INVESTOR_MONEY = "INVESTOR_MONEY"
+
 func (m *OrderPaymentMethod) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
@@ -46,15 +56,15 @@ func (m *OrderPaymentMethod) UnmarshalJSON(data []byte) error {
 	s = strings.ToUpper(strings.TrimSpace(s))
 
 	switch s {
-	case "CARD":
+	case PAYMENT_METHOD_CARD:
 		*m = CARD
-	case "SBP":
+	case PAYMENT_METHOD_SBP:
 		*m = SBP
-	case "CREDIT_CARD", "CREDITCARD":
+	case PAYMENT_METHOD_CREDIT_CARD:
 		*m = CREDIT_CARD
-	case "INVESTOR_MONEY", "INVESTORMONEY":
+	case PAYMENT_METHOD_INVESTOR_MONEY:
 		*m = INVESTOR_MONEY
-	case "UNKNOWN":
+	case PAYMENT_METHOD_UNKNOWN:
 		*m = UNKNOWN
 	default:
 		return fmt.Errorf("unknown payment method: %q", s)
@@ -73,11 +83,11 @@ func (m *OrderStatus) Scan(value interface{}) error {
 	}
 
 	switch str {
-	case "PENDING_PAYMENT":
+	case STATUS_PENDING_PAYMENT:
 		*m = PENDING_PAYMENT
-	case "PAID":
+	case STATUS_PAID:
 		*m = PAID
-	case "CANCELLED":
+	case STATUS_CANCELLED:
 		*m = CANCELLED
 	default:
 		return fmt.Errorf("unknown status: %q", str)
@@ -96,15 +106,15 @@ func (m *OrderPaymentMethod) Scan(value interface{}) error {
 	}
 
 	switch str {
-	case "UNKNOWN":
+	case PAYMENT_METHOD_UNKNOWN:
 		*m = UNKNOWN
-	case "CARD":
+	case PAYMENT_METHOD_CARD:
 		*m = CARD
-	case "SBP":
+	case PAYMENT_METHOD_SBP:
 		*m = SBP
-	case "CREDIT_CARD":
+	case PAYMENT_METHOD_CREDIT_CARD:
 		*m = CREDIT_CARD
-	case "INVESTOR_MONEY":
+	case PAYMENT_METHOD_INVESTOR_MONEY:
 		*m = INVESTOR_MONEY
 	default:
 		return fmt.Errorf("unknown payment method: %q", str)
@@ -115,28 +125,28 @@ func (m *OrderPaymentMethod) Scan(value interface{}) error {
 func (s OrderStatus) String() string {
 	switch s {
 	case PENDING_PAYMENT:
-		return "PENDING_PAYMENT"
+		return STATUS_PENDING_PAYMENT
 	case PAID:
-		return "PAID"
+		return STATUS_PAID
 	case CANCELLED:
-		return "CANCELLED"
+		return STATUS_CANCELLED
 	default:
-		return "PENDING_PAYMENT"
+		return STATUS_PENDING_PAYMENT
 	}
 }
 
 func (m OrderPaymentMethod) String() string {
 	switch m {
 	case UNKNOWN:
-		return "UNKNOWN"
+		return PAYMENT_METHOD_UNKNOWN
 	case CARD:
-		return "CARD"
+		return PAYMENT_METHOD_CARD
 	case SBP:
-		return "SBP"
+		return PAYMENT_METHOD_SBP
 	case CREDIT_CARD:
-		return "CREDIT_CARD"
+		return PAYMENT_METHOD_CREDIT_CARD
 	case INVESTOR_MONEY:
-		return "INVESTOR_MONEY"
+		return PAYMENT_METHOD_INVESTOR_MONEY
 	default:
 		return "UNKNOWN"
 	}

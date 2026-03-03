@@ -22,8 +22,8 @@ type Service struct {
 	OrderRepository db.OrderRepository
 }
 
-func NewService() *Service {
-	return &Service{OrderRepository: db.NewRepository()}
+func NewService(orderRepository db.OrderRepository) *Service {
+	return &Service{OrderRepository: orderRepository}
 }
 
 func (s Service) CreateOrder(ctx context.Context, order *Order, parts []*inventoryModel.Part) error {
@@ -37,6 +37,9 @@ func (s Service) CreateOrder(ctx context.Context, order *Order, parts []*invento
 			return fmt.Errorf("One of part stock quantity not found")
 		}
 		totalPrice += part.Price
+	}
+	if order.PartUuids == nil {
+		order.PartUuids = []string{}
 	}
 
 	order.CreatedAt = time.Now()

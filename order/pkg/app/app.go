@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
 )
@@ -38,8 +39,9 @@ type App struct {
 	PaymentClient   payment.Client
 }
 
-func New(config *Config, serverInventoryAddress, serverPaymentAddress string) *App {
-	a := &App{Config: config, Storage: db.NewRepository(), OrderService: service.NewService()}
+func New(config *Config, serverInventoryAddress, serverPaymentAddress string, pool *pgxpool.Pool) *App {
+	storage := db.NewRepository(pool)
+	a := &App{Config: config, Storage: storage, OrderService: service.NewService(storage)}
 
 	a.InventoryClient, _ = inventory.NewClient(serverInventoryAddress)
 	a.PaymentClient, _ = payment.NewClient(serverPaymentAddress)
