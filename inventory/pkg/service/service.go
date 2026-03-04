@@ -13,17 +13,17 @@ type InventoryService interface {
 var _ InventoryService = (*Service)(nil)
 
 type Service struct {
-	InventoryRepository db.InventoryRepository
+	repo db.InventoryRepository
 }
 
 func NewService(repository db.InventoryRepository) *Service {
 	return &Service{
-		InventoryRepository: repository,
+		repo: repository,
 	}
 }
 
 func (s Service) GetParts(ctx context.Context, filter PartSearch) (map[string]*Part, error) {
-	parts, err := s.InventoryRepository.GetParts(ctx, filter.ToDB())
+	parts, err := s.repo.GetParts(ctx, filter.ToDB())
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (s Service) GetParts(ctx context.Context, filter PartSearch) (map[string]*P
 }
 
 func (s Service) GetPart(ctx context.Context, id string) (*Part, error) {
-	part, err := s.InventoryRepository.GetPart(ctx, id)
+	part, err := s.repo.GetPart(ctx, id)
 	if err != nil {
 		return nil, err
 	}

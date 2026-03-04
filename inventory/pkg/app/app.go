@@ -15,7 +15,7 @@ import (
 )
 
 type Config struct {
-	Port int
+	Port string
 }
 
 type App struct {
@@ -26,11 +26,11 @@ type App struct {
 	Server           *grpc.Server
 }
 
-func New(ctx context.Context, port int, database *db.DB, seed *bool) *App {
+func New(ctx context.Context, port string, database *db.DB, seed bool) *App {
 	a := &App{Config: &Config{Port: port}, Server: grpc.NewServer()}
 	a.repository = db.NewRepository(database)
 
-	if Val(seed) {
+	if seed {
 		a.repository.Seed(ctx)
 	}
 
@@ -45,7 +45,7 @@ func (a *App) createServer() {
 }
 
 func (a *App) Start() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", a.Config.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", a.Config.Port))
 	if err != nil {
 		log.Printf("failed to listen: %v\n", err)
 		return
@@ -55,19 +55,11 @@ func (a *App) Start() {
 	reflection.Register(a.Server)
 
 	go func() {
-		log.Printf("🚀 gRPC server listening on %d\n", a.Config.Port)
+		log.Printf("🚀 gRPC server listening on %s\n", a.Config.Port)
 		err = a.Server.Serve(lis)
 		if err != nil {
 			log.Printf("failed to serve: %v\n", err)
 			return
 		}
 	}()
-}
-
-func Val[T any, P *T](p P) T {
-	if p != nil {
-		return *p
-	}
-	var def T
-	return def
 }

@@ -119,7 +119,11 @@ func (a *Api) PayOrderHandler(ctx context.Context, paymentClient payment.Client)
 			return
 		}
 
-		render.JSON(w, r, service.PayResponse{payOrderResponse.GetTransactionUuid()})
+		type PayResponse struct {
+			TransactionUuid string `json:"transaction_uuid"`
+		}
+
+		render.JSON(w, r, PayResponse{payOrderResponse.GetTransactionUuid()})
 	}
 }
 

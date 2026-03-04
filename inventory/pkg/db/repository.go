@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type InventoryRepository interface {
@@ -17,16 +17,54 @@ type InventoryRepository interface {
 }
 
 type Repository struct {
-	mu sync.RWMutex
-	DB *DB
+	db *DB
 }
 
 var _ InventoryRepository = (*Repository)(nil)
 
 func NewRepository(db *DB) *Repository {
 	return &Repository{
-		DB: db,
+		db: db,
 	}
+}
+
+func NewDB(ctx context.Context, uri, dbName string, initIndexes bool) (*DB, error) {
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
+	}
+
+	// Проверка соединения
+	if err = client.Ping(ctx, nil); err != nil {
+		err = client.Disconnect(ctx)
+		if err != nil {
+			return nil, err
+		} // сразу закрываем, если пинг не прошёл
+		return nil, fmt.Errorf("failed to ping MongoDB: %w", err)
+	}
+
+	database := client.Database(dbName)
+	collection := database.Collection("part")
+
+	if initIndexes {
+		// Создание индексов
+		indexModels := []mongo.IndexModel{
+			{
+				Keys:    bson.D{{Key: "uuid", Value: 1}},
+				Options: options.Index().SetUnique(true).SetName("uuid_unique"),
+			},
+		}
+
+		opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
+		names, err := collection.Indexes().CreateMany(ctx, indexModels, opts)
+		if err != nil {
+			log.Printf("❌ Ошибка создания индекса uuid_unique: %v", err)
+		} else {
+			log.Printf("✅ Индексы созданы: %v", names)
+		}
+	}
+
+	return &DB{MongoClient: client, MongoCollection: collection}, nil
 }
 
 type DB struct {
@@ -36,8 +74,6 @@ type DB struct {
 
 // Seed наполняет базу тестовыми данными
 func (r *Repository) Seed(ctx context.Context) *Repository {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	now := time.Now()
 
 	parts := []Part{
@@ -113,7 +149,7 @@ func (r *Repository) Seed(ctx context.Context) *Repository {
 	insertedCount := 0
 	for _, part := range parts {
 		filter := bson.M{"uuid": part.Uuid}
-		count, err := r.DB.MongoCollection.CountDocuments(ctx, filter)
+		count, err := r.db.MongoCollection.CountDocuments(ctx, filter)
 		if err != nil {
 			log.Printf("Ошибка проверки uuid %s: %v", part.Uuid, err)
 			continue
@@ -123,7 +159,7 @@ func (r *Repository) Seed(ctx context.Context) *Repository {
 			continue
 		}
 
-		_, err = r.DB.MongoCollection.InsertOne(ctx, part)
+		_, err = r.db.MongoCollection.InsertOne(ctx, part)
 		if err != nil {
 			log.Printf("Ошибка вставки uuid %s: %v", part.Uuid, err)
 			continue
@@ -137,10 +173,7 @@ func (r *Repository) Seed(ctx context.Context) *Repository {
 }
 
 func (r *Repository) GetParts(ctx context.Context, filter PartSearch) (map[string]*Part, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	cursor, err := r.DB.MongoCollection.Find(ctx, NewMongoFilter(filter))
+	cursor, err := r.db.MongoCollection.Find(ctx, NewInventoryFilter(filter))
 	if err != nil {
 		return nil, fmt.Errorf("ошибка Find: %w", err)
 	}
@@ -164,7 +197,7 @@ func (r *Repository) GetParts(ctx context.Context, filter PartSearch) (map[strin
 	return result, nil
 }
 
-func NewMongoFilter(filter PartSearch) bson.M {
+func NewInventoryFilter(filter PartSearch) bson.M {
 	mongoFilter := bson.M{}
 
 	if filter.Uuids != nil {
@@ -191,11 +224,8 @@ func NewMongoFilter(filter PartSearch) bson.M {
 }
 
 func (r *Repository) GetPart(ctx context.Context, id string) (*Part, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	var part Part
-	err := r.DB.MongoCollection.FindOne(ctx, bson.M{"uuid": id}).Decode(&part)
+	err := r.db.MongoCollection.FindOne(ctx, bson.M{"uuid": id}).Decode(&part)
 	if err != nil {
 		return nil, fmt.Errorf("part with id %s not found", id)
 	}

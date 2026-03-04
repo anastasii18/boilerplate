@@ -4,15 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"order/pkg/migrator"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 
 	"log"
-	"sync"
 )
 
 type OrderRepository interface {
@@ -22,38 +22,48 @@ type OrderRepository interface {
 }
 
 type Repository struct {
-	mu sync.RWMutex
-	DB *DB
+	db *DB
 }
 
 type DB struct {
 	*pgxpool.Pool
 }
 
-func NewDB(ctx context.Context) (*DB, error) {
-	dbURI := os.Getenv("DB_URI")
-
+func NewDB(ctx context.Context, dbURI string) (*DB, error) {
 	// Создаем пул соединений с базой данных
 	pool, err := pgxpool.New(ctx, dbURI)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v\n", err)
 	}
 	log.Printf("Connecting to database with URI: %s", dbURI)
+
 	return &DB{pool}, nil
+}
+
+func Migrate(ctx context.Context, db *DB, migrationsDir string) {
+	// Инициализируем мигратор
+	dbConfig := db.Pool.Config().ConnConfig
+	sqlDB := stdlib.OpenDB(*dbConfig)
+
+	migratorRunner := migrator.NewMigrator(sqlDB, migrationsDir)
+
+	err := migratorRunner.Up()
+	if err != nil {
+		log.Printf("Ошибка миграции базы данных: %v\n", err)
+		return
+	}
 }
 
 var _ OrderRepository = (*Repository)(nil)
 
 func NewRepository(database *DB) *Repository {
 	return &Repository{
-		DB: database,
+		db: database,
 	}
 }
 
 func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	builderInsert := sq.Insert("\"order\"").
 		PlaceholderFormat(sq.Dollar).
 		Columns("order_uuid", "transaction_uuid", "status", "payment_method",
@@ -69,7 +79,7 @@ func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 	}
 
 	var orderId string
-	err = r.DB.QueryRow(ctx, query, args...).Scan(&orderId)
+	err = r.db.QueryRow(ctx, query, args...).Scan(&orderId)
 	if err != nil {
 		log.Printf("failed to insert note: %v\n", err)
 		return err
@@ -81,8 +91,6 @@ func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 }
 
 func (r *Repository) GetOrder(ctx context.Context, orderUuid string) (*Order, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	builderSelect := sq.Select("*").
 		From("\"order\"").
 		PlaceholderFormat(sq.Dollar).
@@ -94,7 +102,7 @@ func (r *Repository) GetOrder(ctx context.Context, orderUuid string) (*Order, er
 		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
 
-	row, err := r.DB.Query(ctx, query, args...)
+	row, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -112,8 +120,6 @@ func (r *Repository) GetOrder(ctx context.Context, orderUuid string) (*Order, er
 }
 
 func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	_, ok := r.GetOrder(ctx, orderUuid)
 
 	if ok != nil {
@@ -143,7 +149,7 @@ func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transact
 		return fmt.Errorf("failed to build query: %v\n", err)
 	}
 
-	res, err := r.DB.Exec(ctx, query, args...)
+	res, err := r.db.Exec(ctx, query, args...)
 	if err != nil {
 		log.Printf("failed to update order: %v\n", err)
 		return fmt.Errorf("failed to update order: %v\n", err)

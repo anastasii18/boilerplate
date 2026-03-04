@@ -10,27 +10,29 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const grpcPort = 50051
+var seed bool
+var initIndexes bool
 
 func main() {
-	seed := flag.Bool("seed", false, "заполнить тестовыми данными")
-	initIndexes := flag.Bool("init-indexes", false, "создать/обновить индексы в MongoDB")
+	flag.BoolVar(&seed, "seed", false, "заполнить тестовыми данными")
+	flag.BoolVar(&initIndexes, "init-indexes", false, "создать/обновить индексы в MongoDB")
 	flag.Parse()
+
+	config, err := initConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 	ctx := context.Background()
-	mongoDB, err := mongoInit(ctx, initIndexes)
+	mongoDB, err := db.NewDB(ctx, config.MongoURI, config.MongoDB, initIndexes)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Регистрируем наш сервис
-	a := app.New(ctx, grpcPort, mongoDB, seed)
+	a := app.New(ctx, config.GrpcPort, mongoDB, seed)
 	a.Start()
 
 	// Graceful shutdown
@@ -39,10 +41,8 @@ func main() {
 	<-quit
 	log.Println("🛑 Shutting down gRPC server...")
 	a.Server.GracefulStop()
-	// Закрываем соединение с MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
+	// Закрываем соединение с MongoDB
 	if err := mongoDB.MongoClient.Disconnect(ctx); err != nil {
 		log.Printf("⚠️ Ошибка при отключении MongoDB: %v", err)
 	} else {
@@ -52,53 +52,26 @@ func main() {
 	log.Println("✅ Server stopped")
 }
 
-func mongoInit(ctx context.Context, initIndexes *bool) (*db.DB, error) {
+type Config struct {
+	MongoURI string
+	MongoDB  string
+	GrpcPort string
+}
+
+func initConfig() (*Config, error) {
+	var config Config
 	if err := godotenv.Load(); err != nil {
-		log.Printf("failed to load .env: %v", err)
-		// можно не возвращать ошибку, если .env необязателен
+		return nil, fmt.Errorf("failed to load .env: %v", err)
 	}
 
-	uri := os.Getenv("MONGO_URI")
-	if uri == "" {
-		return nil, fmt.Errorf("MONGO_URI не задан")
+	secretsMapping := map[string]*string{
+		"MONGO_URI":             &config.MongoURI,
+		"MONGO_INITDB_DATABASE": &config.MongoDB,
+		"GRPC_PORT":             &config.GrpcPort,
+	}
+	for key, target := range secretsMapping {
+		*target = os.Getenv(key)
 	}
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
-	}
-
-	// Проверка соединения
-	if err := client.Ping(ctx, nil); err != nil {
-		err := client.Disconnect(ctx)
-		if err != nil {
-			return nil, err
-		} // сразу закрываем, если пинг не прошёл
-		return nil, fmt.Errorf("failed to ping MongoDB: %w", err)
-	}
-
-	dbName := os.Getenv("MONGO_INITDB_DATABASE")
-
-	database := client.Database(dbName)
-	collection := database.Collection("part")
-
-	if app.Val(initIndexes) {
-		// Создание индексов
-		indexModels := []mongo.IndexModel{
-			{
-				Keys:    bson.D{{Key: "uuid", Value: 1}},
-				Options: options.Index().SetUnique(true).SetName("uuid_unique"),
-			},
-		}
-
-		opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
-		names, err := collection.Indexes().CreateMany(ctx, indexModels, opts)
-		if err != nil {
-			log.Printf("❌ Ошибка создания индекса uuid_unique: %v", err)
-		} else {
-			log.Printf("✅ Индексы созданы: %v", names)
-		}
-	}
-
-	return &db.DB{MongoClient: client, MongoCollection: collection}, nil
+	return &config, nil
 }

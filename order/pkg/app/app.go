@@ -10,15 +10,12 @@ import (
 	"order/pkg/client/inventory"
 	"order/pkg/client/payment"
 	"order/pkg/db"
-	"order/pkg/migrator"
 	"order/pkg/service"
-	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/jackc/pgx/v5/stdlib"
 )
 
 type Config struct {
@@ -94,22 +91,6 @@ func (a *App) Start() {
 			log.Printf("❌ Ошибка запуска сервера: %v\n", err)
 		}
 	}()
-}
-
-func (a *App) Migrate(ctx context.Context) {
-	// Инициализируем мигратор
-	migrationsDir := os.Getenv("MIGRATIONS_DIR")
-
-	dbConfig := a.Storage.DB.Pool.Config().ConnConfig
-	sqlDB := stdlib.OpenDB(*dbConfig)
-
-	migratorRunner := migrator.NewMigrator(sqlDB, migrationsDir)
-
-	err := migratorRunner.Up()
-	if err != nil {
-		log.Printf("Ошибка миграции базы данных: %v\n", err)
-		return
-	}
 }
 
 func (a *App) Stop() {
