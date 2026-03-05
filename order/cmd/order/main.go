@@ -1,26 +1,40 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"order/pkg/app"
+	"order/pkg/db"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 const (
-	httpPort               = "8080"
-	serverInventoryAddress = "localhost:50051"
-	serverPaymentAddress   = "localhost:50052"
 	// Таймауты для HTTP-сервера
 	readHeaderTimeout = 5 * time.Second
 	shutdownTimeout   = 10 * time.Second
 )
 
 func main() {
-	cfg := app.Config{Port: httpPort, ReadHeaderTimeout: readHeaderTimeout, ShutdownTimeout: shutdownTimeout}
-	a := app.New(&cfg, serverInventoryAddress, serverPaymentAddress)
+	ctx := context.Background()
+	config, err := initConfig()
+	if err != nil {
+		log.Printf("failed to init config: %v\n", err)
+	}
+	config.ReadHeaderTimeout = readHeaderTimeout
+	config.ShutdownTimeout = shutdownTimeout
+	database, err := db.NewDB(ctx, config.DbUri)
+	db.Migrate(ctx, database, config.MigrationsDir)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	a := app.New(ctx, config, database)
 	a.Start()
 
 	// Graceful shutdown
@@ -31,4 +45,24 @@ func main() {
 	log.Println("🛑 Завершение работы сервера...")
 
 	a.Stop()
+}
+
+func initConfig() (*app.Config, error) {
+	var config app.Config
+	if err := godotenv.Load(); err != nil {
+		return nil, fmt.Errorf("failed to load .env: %v", err)
+	}
+
+	secretsMapping := map[string]*string{
+		"DB_URI":                   &config.DbUri,
+		"MIGRATIONS_DIR":           &config.MigrationsDir,
+		"HTTP_PORT":                &config.HttpPort,
+		"SERVER_INVENTORY_ADDRESS": &config.ServerInventoryAddress,
+		"SERVER_PAYMENT_ADDRESS":   &config.ServerPaymentAddress,
+	}
+	for key, target := range secretsMapping {
+		*target = os.Getenv(key)
+	}
+
+	return &config, nil
 }

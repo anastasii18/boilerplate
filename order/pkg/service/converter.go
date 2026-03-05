@@ -13,6 +13,8 @@ func OrderToRepoModel(order *Order) *repomodel.Order {
 		TransactionUuid: order.TransactionUuid,
 		PaymentMethod:   repomodel.OrderPaymentMethod(order.PaymentMethod),
 		Status:          repomodel.OrderStatus(order.Status),
+		CreatedAt:       order.CreatedAt,
+		UpdatedAt:       order.UpdatedAt,
 	}
 }
 
@@ -25,6 +27,8 @@ func RepoModelToOrder(order *repomodel.Order) *Order {
 		TransactionUuid: order.TransactionUuid,
 		PaymentMethod:   OrderPaymentMethod(order.PaymentMethod),
 		Status:          OrderStatus(order.Status),
+		CreatedAt:       order.CreatedAt,
+		UpdatedAt:       order.UpdatedAt,
 	}
 }
 

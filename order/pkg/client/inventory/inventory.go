@@ -49,3 +49,18 @@ func (c *Client) GetInventoryParts(parts *inventoryV1.GetListPartsResponse) []*i
 
 	return newParts
 }
+
+func (c *Client) GetInventoryPartsForIDs(ctx context.Context, partUuids []string) ([]*inventoryService.Part, error) {
+	if partUuids == nil {
+		return []*inventoryService.Part{}, nil
+	}
+
+	parts, err := c.GetListParts(ctx, partUuids)
+
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения деталей: %w", err)
+	}
+	newParts := c.GetInventoryParts(parts)
+
+	return newParts, nil
+}

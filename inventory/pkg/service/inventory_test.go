@@ -7,16 +7,16 @@ import (
 )
 
 var s = Service{
-	InventoryRepository: db.NewRepository().Seed(),
+	repo: db.NewRepository().Seed(),
 }
 var oneId = "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-var onet, _ = s.InventoryRepository.GetPart(oneId)
+var onet, _ = s.repo.GetPart(oneId)
 var one = NewPart(onet)
 var twoId = "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
-var twot, _ = s.InventoryRepository.GetPart(twoId)
+var twot, _ = s.repo.GetPart(twoId)
 var two = NewPart(twot)
 var threeId = "29a9ab94-c814-4828-9a02-b96598dbe299"
-var threet, _ = s.InventoryRepository.GetPart(threeId)
+var threet, _ = s.repo.GetPart(threeId)
 var three = NewPart(threet)
 
 func TestGetPart(t *testing.T) {

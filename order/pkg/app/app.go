@@ -19,31 +19,37 @@ import (
 )
 
 type Config struct {
-	Port              string
-	ReadHeaderTimeout time.Duration
-	ShutdownTimeout   time.Duration
+	ReadHeaderTimeout      time.Duration
+	ShutdownTimeout        time.Duration
+	DbUri                  string
+	MigrationsDir          string
+	HttpPort               string
+	ServerInventoryAddress string
+	ServerPaymentAddress   string
 }
 
 type App struct {
 	Config          *Config
-	Storage         *db.Repository
+	Repo            *db.Repository
 	Server          *http.Server
 	OrderService    service.OrderService
 	InventoryClient inventory.Client
 	PaymentClient   payment.Client
 }
 
-func New(config *Config, serverInventoryAddress, serverPaymentAddress string) *App {
-	a := &App{Config: config, Storage: db.NewRepository(), OrderService: service.NewService()}
+func New(ctx context.Context, config *Config, database *db.DB) *App {
+	repo := db.NewRepository(database)
+	inventoryClient, _ := inventory.NewClient(config.ServerInventoryAddress)
 
-	a.InventoryClient, _ = inventory.NewClient(serverInventoryAddress)
-	a.PaymentClient, _ = payment.NewClient(serverPaymentAddress)
-	a.createServer(a.createRouter())
+	a := &App{Config: config, Repo: repo, OrderService: service.NewService(repo, inventoryClient), InventoryClient: inventoryClient}
+
+	a.PaymentClient, _ = payment.NewClient(config.ServerPaymentAddress)
+	a.createServer(a.createRouter(ctx))
 
 	return a
 }
 
-func (app *App) createRouter() *chi.Mux {
+func (app *App) createRouter(ctx context.Context) *chi.Mux {
 	// Инициализируем роутер Chi
 	r := chi.NewRouter()
 
@@ -57,13 +63,13 @@ func (app *App) createRouter() *chi.Mux {
 	// Определяем маршруты
 	r.Route("/api/v1/orders", func(r chi.Router) {
 		// Получить заказ по UUID
-		r.Get("/{order_uuid}", a.GetOrderHandler())
+		r.Get("/{order_uuid}", a.GetOrderHandler(ctx))
 		// Создание заказа
-		r.Post("/", a.CreateOrderHandler(app.InventoryClient))
+		r.Post("/", a.CreateOrderHandler(ctx))
 		// Оплата заказа
-		r.Post("/{order_uuid}/pay", a.PayOrderHandler(app.PaymentClient))
+		r.Post("/{order_uuid}/pay", a.PayOrderHandler(ctx, app.PaymentClient))
 		// Отменить заказ
-		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler())
+		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler(ctx))
 	})
 
 	return r
@@ -71,7 +77,7 @@ func (app *App) createRouter() *chi.Mux {
 
 func (a *App) createServer(r *chi.Mux) {
 	a.Server = &http.Server{
-		Addr:              net.JoinHostPort("localhost", a.Config.Port),
+		Addr:              net.JoinHostPort("localhost", a.Config.HttpPort),
 		Handler:           r,
 		ReadHeaderTimeout: a.Config.ReadHeaderTimeout, // Защита от Slowloris атак - тип DDoS-атаки, при которой
 		// атакующий умышленно медленно отправляет HTTP-заголовки, удерживая соединения открытыми и истощая
@@ -84,7 +90,7 @@ func (a *App) Start() {
 
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		log.Printf("🚀 HTTP-сервер запущен на порту %s\n", a.Config.Port)
+		log.Printf("🚀 HTTP-сервер запущен на порту %s\n", a.Config.HttpPort)
 		err := a.Server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("❌ Ошибка запуска сервера: %v\n", err)

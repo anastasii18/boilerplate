@@ -3,29 +3,32 @@ package db
 import (
 	"fmt"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Part struct {
-	Uuid          string            // Уникальный идентификатор детали
-	Name          string            // Название детали
-	Description   string            // Описание детали
-	Price         float64           // Цена за единицу
-	StockQuantity int64             // Количество на складе
-	Category      Category          // Категория
-	Dimensions    *Dimensions       // Размеры детали
-	Manufacturer  *Manufacturer     // Информация о производителе
-	Tags          []string          // Теги для быстрого поиска
-	Metadata      map[string]*Value // Гибкие метаданные
-	CreatedAt     time.Time         // Дата создания
-	UpdatedAt     *time.Time        // Дата обновления
+	ID            primitive.ObjectID `bson:"_id,omitempty"`
+	Uuid          string             `bson:"uuid"`           // Уникальный идентификатор детали
+	Name          string             `bson:"name"`           // Название детали
+	Description   string             `bson:"description"`    // Описание детали
+	Price         float64            `bson:"price"`          // Цена за единицу
+	StockQuantity int64              `bson:"stock_quantity"` // Количество на складе
+	Category      Category           `bson:"category"`       // Категория
+	Dimensions    *Dimensions        `bson:"dimensions"`     // Размеры детали
+	Manufacturer  *Manufacturer      `bson:"manufacturer"`   // Информация о производителе
+	Tags          []string           `bson:"tags"`           // Теги для быстрого поиска
+	Metadata      map[string]*Value  `bson:"metadata"`       // Гибкие метаданные
+	CreatedAt     time.Time          `bson:"created_at"`     // Дата создания
+	UpdatedAt     *time.Time         `bson:"updated_at"`     // Дата обновления
 }
 
 type PartSearch struct {
-	Uuids                 []string
-	Names                 []string
-	Categories            []Category
-	ManufacturerCountries []string
-	Tags                  []string
+	Uuids                 []string   `json:"uuids,omitempty"`
+	Names                 []string   `json:"names,omitempty"`
+	Categories            []Category `json:"categories,omitempty"`
+	ManufacturerCountries []string   `json:"manufacturer_countries,omitempty"`
+	Tags                  []string   `json:"tags,omitempty"`
 }
 
 func NewPartSearch(categories []Category, uuids, names, manufacturerCountries, tags []string) PartSearch {
@@ -45,25 +48,25 @@ const (
 
 // Размеры детали
 type Dimensions struct {
-	Length float64 // Длина в см
-	Width  float64 // Ширина в см
-	Height float64 // Высота в см
-	Weight float64 // Вес в кг
+	Length float64 `bson:"length"` // Длина в см
+	Width  float64 `bson:"width"`  // Ширина в см
+	Height float64 `bson:"height"` // Высота в см
+	Weight float64 `bson:"weight"` // Вес в кг
 }
 
 // Информация о производителе
 type Manufacturer struct {
-	Name    string // Название
-	Country string // Страна производства
-	Website string // Сайт производителя
+	Name    string `bson:"name"`    // Название
+	Country string `bson:"country"` // Страна производства
+	Website string `bson:"website"` // Сайт производителя
 }
 
 // Гибкие метаданные
 type Value struct {
-	StringVal *string
-	IntVal    *int64
-	FloatVal  *float64
-	BoolVal   *bool
+	StringVal *string  `bson:"string_val"`
+	IntVal    *int64   `bson:"int_val"`
+	FloatVal  *float64 `bson:"float_val"`
+	BoolVal   *bool    `bson:"bool_val"`
 }
 
 func (v Value) IsSet() bool {

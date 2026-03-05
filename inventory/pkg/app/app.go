@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"inventory/pkg/db"
 	rpc "inventory/pkg/grpc"
@@ -14,7 +15,9 @@ import (
 )
 
 type Config struct {
-	Port int
+	MongoURI string
+	MongoDB  string
+	GrpcPort string
 }
 
 type App struct {
@@ -25,9 +28,14 @@ type App struct {
 	Server           *grpc.Server
 }
 
-func New(port int) *App {
-	a := &App{Config: &Config{Port: port}, Server: grpc.NewServer()}
-	a.repository = db.NewRepository().Seed()
+func New(ctx context.Context, config *Config, database *db.DB, seed bool) *App {
+	a := &App{Config: config, Server: grpc.NewServer()}
+	a.repository = db.NewRepository(database)
+
+	if seed {
+		a.repository.Seed(ctx)
+	}
+
 	a.inventoryService = service.NewService(a.repository)
 
 	return a
@@ -39,7 +47,7 @@ func (a *App) createServer() {
 }
 
 func (a *App) Start() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", a.Config.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", a.Config.GrpcPort))
 	if err != nil {
 		log.Printf("failed to listen: %v\n", err)
 		return
@@ -49,7 +57,7 @@ func (a *App) Start() {
 	reflection.Register(a.Server)
 
 	go func() {
-		log.Printf("🚀 gRPC server listening on %d\n", a.Config.Port)
+		log.Printf("🚀 gRPC server listening on %s\n", a.Config.GrpcPort)
 		err = a.Server.Serve(lis)
 		if err != nil {
 			log.Printf("failed to serve: %v\n", err)

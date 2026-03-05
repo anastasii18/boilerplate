@@ -1,38 +1,42 @@
 package service
 
 import (
+	"context"
 	"inventory/pkg/db"
 )
 
 type InventoryService interface {
-	GetParts(filter PartSearch) map[string]*Part
-	GetPart(id string) (*Part, error)
+	GetParts(ctx context.Context, filter PartSearch) (map[string]*Part, error)
+	GetPart(ctx context.Context, id string) (*Part, error)
 }
 
 var _ InventoryService = (*Service)(nil)
 
 type Service struct {
-	InventoryRepository db.InventoryRepository
+	repo db.InventoryRepository
 }
 
 func NewService(repository db.InventoryRepository) *Service {
 	return &Service{
-		InventoryRepository: repository,
+		repo: repository,
 	}
 }
 
-func (s Service) GetParts(filter PartSearch) map[string]*Part {
-	parts := s.InventoryRepository.GetParts(filter.ToDB())
+func (s Service) GetParts(ctx context.Context, filter PartSearch) (map[string]*Part, error) {
+	parts, err := s.repo.GetParts(ctx, filter.ToDB())
+	if err != nil {
+		return nil, err
+	}
 	result := make(map[string]*Part)
 	for id, value := range parts {
 		result[id] = NewPart(value)
 	}
 
-	return result
+	return result, nil
 }
 
-func (s Service) GetPart(id string) (*Part, error) {
-	part, err := s.InventoryRepository.GetPart(id)
+func (s Service) GetPart(ctx context.Context, id string) (*Part, error) {
+	part, err := s.repo.GetPart(ctx, id)
 	if err != nil {
 		return nil, err
 	}
