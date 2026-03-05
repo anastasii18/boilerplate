@@ -15,7 +15,9 @@ import (
 )
 
 type Config struct {
-	Port string
+	MongoURI string
+	MongoDB  string
+	GrpcPort string
 }
 
 type App struct {
@@ -26,8 +28,8 @@ type App struct {
 	Server           *grpc.Server
 }
 
-func New(ctx context.Context, port string, database *db.DB, seed bool) *App {
-	a := &App{Config: &Config{Port: port}, Server: grpc.NewServer()}
+func New(ctx context.Context, config *Config, database *db.DB, seed bool) *App {
+	a := &App{Config: config, Server: grpc.NewServer()}
 	a.repository = db.NewRepository(database)
 
 	if seed {
@@ -45,7 +47,7 @@ func (a *App) createServer() {
 }
 
 func (a *App) Start() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", a.Config.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", a.Config.GrpcPort))
 	if err != nil {
 		log.Printf("failed to listen: %v\n", err)
 		return
@@ -55,7 +57,7 @@ func (a *App) Start() {
 	reflection.Register(a.Server)
 
 	go func() {
-		log.Printf("🚀 gRPC server listening on %s\n", a.Config.Port)
+		log.Printf("🚀 gRPC server listening on %s\n", a.Config.GrpcPort)
 		err = a.Server.Serve(lis)
 		if err != nil {
 			log.Printf("failed to serve: %v\n", err)

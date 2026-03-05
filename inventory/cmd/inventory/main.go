@@ -27,12 +27,18 @@ func main() {
 		log.Fatal(err)
 	}
 	ctx := context.Background()
-	mongoDB, err := db.NewDB(ctx, config.MongoURI, config.MongoDB, initIndexes)
+
+	mongoDB, err := db.NewDB(ctx, config.MongoURI, config.MongoDB)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = mongoDB.InitIndex(ctx, initIndexes)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Регистрируем наш сервис
-	a := app.New(ctx, config.GrpcPort, mongoDB, seed)
+	a := app.New(ctx, config, mongoDB, seed)
 	a.Start()
 
 	// Graceful shutdown
@@ -52,14 +58,8 @@ func main() {
 	log.Println("✅ Server stopped")
 }
 
-type Config struct {
-	MongoURI string
-	MongoDB  string
-	GrpcPort string
-}
-
-func initConfig() (*Config, error) {
-	var config Config
+func initConfig() (*app.Config, error) {
+	var config app.Config
 	if err := godotenv.Load(); err != nil {
 		return nil, fmt.Errorf("failed to load .env: %v", err)
 	}

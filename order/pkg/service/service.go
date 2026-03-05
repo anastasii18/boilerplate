@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	inventoryModel "inventory/pkg/service"
+	"order/pkg/client/inventory"
 	"order/pkg/db"
 	"time"
 
@@ -11,7 +11,7 @@ import (
 )
 
 type OrderService interface {
-	CreateOrder(ctx context.Context, order *Order, newParts []*inventoryModel.Part) error
+	CreateOrder(ctx context.Context, order *Order) error
 	GetOrder(ctx context.Context, orderUuid string) (*Order, error)
 	UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
 }
@@ -19,22 +19,25 @@ type OrderService interface {
 var _ OrderService = (*Service)(nil)
 
 type Service struct {
-	repo db.OrderRepository
+	repo            db.OrderRepository
+	inventoryClient inventory.Client
 }
 
-func NewService(orderRepository db.OrderRepository) *Service {
-	return &Service{repo: orderRepository}
+func NewService(orderRepository db.OrderRepository, inventoryClient inventory.Client) *Service {
+	return &Service{repo: orderRepository, inventoryClient: inventoryClient}
 }
 
-func (s Service) CreateOrder(ctx context.Context, order *Order, parts []*inventoryModel.Part) error {
+func (s Service) CreateOrder(ctx context.Context, order *Order) error {
+	parts, _ := s.inventoryClient.GetInventoryPartsForIDs(ctx, order.PartUuids)
+
 	// Проверяет, что все детали существуют. Если хотя бы одной нет — возвращает ошибку
 	if len(order.PartUuids) != len(parts) {
-		return fmt.Errorf("One of part not found")
+		return fmt.Errorf("one of part not found")
 	}
 	totalPrice := 0.0
 	for _, part := range parts {
 		if part.StockQuantity < 1 {
-			return fmt.Errorf("One of part stock quantity not found")
+			return fmt.Errorf("one of part stock quantity not found")
 		}
 		totalPrice += part.Price
 	}

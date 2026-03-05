@@ -26,14 +26,15 @@ func main() {
 	if err != nil {
 		log.Printf("failed to init config: %v\n", err)
 	}
-	cfg := app.Config{Port: config.HttpPort, ReadHeaderTimeout: readHeaderTimeout, ShutdownTimeout: shutdownTimeout}
+	config.ReadHeaderTimeout = readHeaderTimeout
+	config.ShutdownTimeout = shutdownTimeout
 	database, err := db.NewDB(ctx, config.DbUri)
 	db.Migrate(ctx, database, config.MigrationsDir)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := app.New(ctx, &cfg, config.ServerInventoryAddress, config.ServerPaymentAddress, database)
+	a := app.New(ctx, config, database)
 	a.Start()
 
 	// Graceful shutdown
@@ -46,16 +47,8 @@ func main() {
 	a.Stop()
 }
 
-type Config struct {
-	DbUri                  string
-	MigrationsDir          string
-	HttpPort               string
-	ServerInventoryAddress string
-	ServerPaymentAddress   string
-}
-
-func initConfig() (*Config, error) {
-	var config Config
+func initConfig() (*app.Config, error) {
+	var config app.Config
 	if err := godotenv.Load(); err != nil {
 		return nil, fmt.Errorf("failed to load .env: %v", err)
 	}

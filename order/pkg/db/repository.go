@@ -32,10 +32,16 @@ type DB struct {
 func NewDB(ctx context.Context, dbURI string) (*DB, error) {
 	// Создаем пул соединений с базой данных
 	pool, err := pgxpool.New(ctx, dbURI)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v\n", err)
 	}
+
+	err = pool.Ping(ctx)
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
 	log.Printf("Connecting to database with URI: %s", dbURI)
 
 	return &DB{pool}, nil

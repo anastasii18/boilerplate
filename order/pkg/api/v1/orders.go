@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	inventoryModel "inventory/pkg/service"
 	"log"
 	"net/http"
-	"order/pkg/client/inventory"
 	"order/pkg/client/payment"
 	"order/pkg/service"
 
@@ -28,7 +26,7 @@ func New(service service.OrderService) *Api {
 }
 
 // Создаёт новый заказ на основе выбранных пользователем деталей.
-func (a *Api) CreateOrderHandler(ctx context.Context, inventoryClient inventory.Client) http.HandlerFunc {
+func (a *Api) CreateOrderHandler(ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Декодируем данные из тела запроса
 		var orderCreate service.Order
@@ -36,18 +34,8 @@ func (a *Api) CreateOrderHandler(ctx context.Context, inventoryClient inventory.
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		var newParts []*inventoryModel.Part
 
-		if orderCreate.PartUuids != nil {
-			parts, err := inventoryClient.GetListParts(ctx, orderCreate.PartUuids)
-
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			newParts = inventoryClient.GetInventoryParts(parts)
-		}
-		err := a.orderService.CreateOrder(ctx, &orderCreate, newParts)
+		err := a.orderService.CreateOrder(ctx, &orderCreate)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

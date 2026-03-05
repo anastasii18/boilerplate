@@ -28,7 +28,7 @@ func NewRepository(db *DB) *Repository {
 	}
 }
 
-func NewDB(ctx context.Context, uri, dbName string, initIndexes bool) (*DB, error) {
+func NewDB(ctx context.Context, uri, dbName string) (*DB, error) {
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
@@ -46,25 +46,29 @@ func NewDB(ctx context.Context, uri, dbName string, initIndexes bool) (*DB, erro
 	database := client.Database(dbName)
 	collection := database.Collection("part")
 
-	if initIndexes {
-		// Создание индексов
-		indexModels := []mongo.IndexModel{
-			{
-				Keys:    bson.D{{Key: "uuid", Value: 1}},
-				Options: options.Index().SetUnique(true).SetName("uuid_unique"),
-			},
-		}
+	return &DB{MongoClient: client, MongoCollection: collection}, nil
+}
 
-		opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
-		names, err := collection.Indexes().CreateMany(ctx, indexModels, opts)
-		if err != nil {
-			log.Printf("❌ Ошибка создания индекса uuid_unique: %v", err)
-		} else {
-			log.Printf("✅ Индексы созданы: %v", names)
-		}
+func (db *DB) InitIndex(ctx context.Context, initIndexes bool) error {
+	if !initIndexes {
+		return nil
+	}
+	// Создание индексов
+	indexModels := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "uuid", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("uuid_unique"),
+		},
 	}
 
-	return &DB{MongoClient: client, MongoCollection: collection}, nil
+	opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
+	names, err := db.MongoCollection.Indexes().CreateMany(ctx, indexModels, opts)
+	if err != nil {
+		return fmt.Errorf("ошибка создания индекса uuid_unique: %w", err)
+	}
+
+	log.Printf("Индексы созданы: %v", names)
+	return nil
 }
 
 type DB struct {
@@ -185,7 +189,7 @@ func (r *Repository) GetParts(ctx context.Context, filter PartSearch) (map[strin
 	for cursor.Next(ctx) {
 		var part Part
 		if err := cursor.Decode(&part); err != nil {
-			return nil, fmt.Errorf("Ошибка декодирования: %v", err)
+			return nil, fmt.Errorf("ошибка декодирования: %w", err)
 		}
 		result[part.Uuid] = &part
 	}
