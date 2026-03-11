@@ -36,7 +36,7 @@ func TestGetOrder(t *testing.T) {
 					Status:          db.PAID,
 					TotalPrice:      1499.99,
 					PaymentMethod:   db.CARD,
-					TransactionUuid: "2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc",
+					TransactionUuid: Ptr("2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc"),
 				}
 
 				m.On("GetOrder", args.OrderID).
@@ -47,7 +47,7 @@ func TestGetOrder(t *testing.T) {
 				Status:          db.PAID,
 				TotalPrice:      1499.99,
 				PaymentMethod:   db.CARD,
-				TransactionUuid: "2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc",
+				TransactionUuid: Ptr("2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc"),
 			},
 			wantErr: false,
 		},
@@ -173,7 +173,7 @@ func TestUpdateOrder(t *testing.T) {
 					OrderUuid:       args.orderUuid,
 					Status:          Val(args.status),
 					PaymentMethod:   Val(args.paymentMethod),
-					TransactionUuid: Val(args.transactionUuid),
+					TransactionUuid: args.transactionUuid,
 				}
 				m.On("GetOrder", args.orderUuid).
 					Return(expectedOrder, nil).
@@ -211,7 +211,7 @@ func TestUpdateOrder(t *testing.T) {
 
 					require.Equal(t, Val(tt.args.status), got.Status)
 					require.Equal(t, Val(tt.args.paymentMethod), got.PaymentMethod)
-					require.Equal(t, Val(tt.args.transactionUuid), got.TransactionUuid)
+					require.Equal(t, Val(tt.args.transactionUuid), Val(got.TransactionUuid))
 					require.Equal(t, tt.args.orderUuid, got.OrderUuid)
 				}
 			}

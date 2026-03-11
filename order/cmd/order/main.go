@@ -34,8 +34,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := app.New(ctx, config, database)
-	a.Start()
+	a, err := app.New(ctx, config)
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)

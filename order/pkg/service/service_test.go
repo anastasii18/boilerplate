@@ -34,7 +34,7 @@ func TestGetOrder(t *testing.T) {
 					Status:          service.PAID,
 					TotalPrice:      1499.99,
 					PaymentMethod:   service.CARD,
-					TransactionUuid: "2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc",
+					TransactionUuid: Ptr("2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc"),
 				}
 
 				m.On("GetOrder", args.orderUuid).
@@ -45,7 +45,7 @@ func TestGetOrder(t *testing.T) {
 				Status:          service.PAID,
 				TotalPrice:      1499.99,
 				PaymentMethod:   service.CARD,
-				TransactionUuid: "2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc",
+				TransactionUuid: Ptr("2aafc0e7-4bc4-4c95-a699-9a6ee4449ddc"),
 			},
 			wantErr: false,
 		},
@@ -90,4 +90,12 @@ func TestGetOrder(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Ptr[T comparable](t T) *T {
+	var def T
+	if t == def {
+		return nil
+	}
+	return &t
 }
