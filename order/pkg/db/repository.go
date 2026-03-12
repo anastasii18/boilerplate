@@ -87,11 +87,11 @@ func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 	var orderId string
 	err = r.db.QueryRow(ctx, query, args...).Scan(&orderId)
 	if err != nil {
-		log.Printf("failed to insert note: %v\n", err)
+		log.Printf("failed to insert order: %v\n", err)
 		return err
 	}
 
-	log.Printf("inserted note with id: %s\n", orderId)
+	log.Printf("inserted order with id: %s\n", orderId)
 
 	return nil
 }
