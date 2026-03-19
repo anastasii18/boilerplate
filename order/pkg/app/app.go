@@ -3,8 +3,9 @@ package app
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
+	logger "platform/pkg"
 	"time"
 )
 
@@ -37,8 +38,7 @@ func (app *App) initDeps(ctx context.Context) error {
 	inits := []func(context.Context) error{
 		app.initDI,
 		app.initServer,
-		//TODO: a.initLogger,
-		//TODO: a.initCloser,
+		app.initLogger,
 	}
 
 	for _, f := range inits {
@@ -56,15 +56,23 @@ func (app *App) initDI(ctx context.Context) error {
 	return nil
 }
 
+// Уровень логирования (debug, info, warn, error)
+func (app *App) initLogger(ctx context.Context) error {
+	return logger.Init(
+		"debug",
+		true,
+	)
+}
+
 func (app *App) initServer(ctx context.Context) error {
 	app.diContainer.NewOrderService(ctx, app.Config)
 	app.diContainer.NewServer(ctx, app.Config)
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		log.Printf("🚀 HTTP-сервер запущен на порту %s\n", app.Config.HttpPort)
+		logger.Info(ctx, fmt.Sprintf("🚀 HTTP-сервер запущен на порту %s\n", app.Config.HttpPort))
 		err := app.diContainer.Server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("❌ Ошибка запуска сервера: %v\n", err)
+			logger.Info(ctx, fmt.Sprintf("❌ Ошибка запуска сервера: %v\n", err))
 		}
 	}()
 
@@ -78,8 +86,8 @@ func (app *App) Stop() {
 
 	err := app.diContainer.Server.Shutdown(ctx)
 	if err != nil {
-		log.Printf("❌ Ошибка при остановке сервера: %v\n", err)
+		logger.Info(ctx, fmt.Sprintf("❌ Ошибка при остановке сервера: %v\n", err))
 	}
 
-	log.Println("✅ Сервер остановлен")
+	logger.Info(ctx, "✅ Сервер остановлен")
 }

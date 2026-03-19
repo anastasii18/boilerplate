@@ -8,6 +8,7 @@ import (
 	"order/pkg/db"
 	"os"
 	"os/signal"
+	logger "platform/pkg"
 	"syscall"
 	"time"
 
@@ -41,7 +42,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("🛑 Завершение работы сервера...")
+	logger.Info(ctx, "Завершение работы сервера...")
 
 	a.Stop()
 }
