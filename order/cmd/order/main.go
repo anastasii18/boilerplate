@@ -8,6 +8,7 @@ import (
 	"order/pkg/db"
 	"os"
 	"os/signal"
+	logger "platform/pkg"
 	"syscall"
 	"time"
 
@@ -34,15 +35,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := app.New(ctx, config, database)
-	a.Start()
+	a, err := app.New(ctx, config)
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("🛑 Завершение работы сервера...")
+	logger.Info(ctx, "Завершение работы сервера...")
 
 	a.Stop()
 }

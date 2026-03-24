@@ -3,19 +3,10 @@ package app
 import (
 	"context"
 	"errors"
-	"log"
-	"net"
+	"fmt"
 	"net/http"
-	api "order/pkg/api/v1"
-	"order/pkg/client/inventory"
-	"order/pkg/client/payment"
-	"order/pkg/db"
-	"order/pkg/service"
+	logger "platform/pkg"
 	"time"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/render"
 )
 
 type Config struct {
@@ -29,84 +20,74 @@ type Config struct {
 }
 
 type App struct {
-	Config          *Config
-	Repo            *db.Repository
-	Server          *http.Server
-	OrderService    service.OrderService
-	InventoryClient inventory.Client
-	PaymentClient   payment.Client
+	Config      *Config
+	diContainer *diContainer
 }
 
-func New(ctx context.Context, config *Config, database *db.DB) *App {
-	repo := db.NewRepository(database)
-	inventoryClient, _ := inventory.NewClient(config.ServerInventoryAddress)
-
-	a := &App{Config: config, Repo: repo, OrderService: service.NewService(repo, inventoryClient), InventoryClient: inventoryClient}
-
-	a.PaymentClient, _ = payment.NewClient(config.ServerPaymentAddress)
-	a.createServer(a.createRouter(ctx))
-
-	return a
-}
-
-func (app *App) createRouter(ctx context.Context) *chi.Mux {
-	// Инициализируем роутер Chi
-	r := chi.NewRouter()
-
-	// Добавляем middleware
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(10 * time.Second))
-	r.Use(render.SetContentType(render.ContentTypeJSON))
-
-	a := api.New(app.OrderService)
-	// Определяем маршруты
-	r.Route("/api/v1/orders", func(r chi.Router) {
-		// Получить заказ по UUID
-		r.Get("/{order_uuid}", a.GetOrderHandler(ctx))
-		// Создание заказа
-		r.Post("/", a.CreateOrderHandler(ctx))
-		// Оплата заказа
-		r.Post("/{order_uuid}/pay", a.PayOrderHandler(ctx, app.PaymentClient))
-		// Отменить заказ
-		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler(ctx))
-	})
-
-	return r
-}
-
-func (a *App) createServer(r *chi.Mux) {
-	a.Server = &http.Server{
-		Addr:              net.JoinHostPort("localhost", a.Config.HttpPort),
-		Handler:           r,
-		ReadHeaderTimeout: a.Config.ReadHeaderTimeout, // Защита от Slowloris атак - тип DDoS-атаки, при которой
-		// атакующий умышленно медленно отправляет HTTP-заголовки, удерживая соединения открытыми и истощая
-		// пул доступных соединений на сервере. ReadHeaderTimeout принудительно закрывает соединение,
-		// если клиент не успел отправить все заголовки за отведенное время.
+func New(ctx context.Context, config *Config) (*App, error) {
+	a := &App{Config: config}
+	err := a.initDeps(ctx)
+	if err != nil {
+		return nil, err
 	}
+
+	return a, nil
 }
 
-func (a *App) Start() {
+func (app *App) initDeps(ctx context.Context) error {
+	inits := []func(context.Context) error{
+		app.initDI,
+		app.initServer,
+		app.initLogger,
+	}
 
+	for _, f := range inits {
+		err := f(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (app *App) initDI(ctx context.Context) error {
+	app.diContainer = NewDiContainer()
+	return nil
+}
+
+// Уровень логирования (debug, info, warn, error)
+func (app *App) initLogger(ctx context.Context) error {
+	return logger.Init(
+		"debug",
+		true,
+	)
+}
+
+func (app *App) initServer(ctx context.Context) error {
+	app.diContainer.NewOrderService(ctx, app.Config)
+	app.diContainer.NewServer(ctx, app.Config)
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		log.Printf("🚀 HTTP-сервер запущен на порту %s\n", a.Config.HttpPort)
-		err := a.Server.ListenAndServe()
+		logger.Info(ctx, fmt.Sprintf("🚀 HTTP-сервер запущен на порту %s\n", app.Config.HttpPort))
+		err := app.diContainer.Server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("❌ Ошибка запуска сервера: %v\n", err)
+			logger.Info(ctx, fmt.Sprintf("❌ Ошибка запуска сервера: %v\n", err))
 		}
 	}()
+
+	return nil
 }
 
-func (a *App) Stop() {
+func (app *App) Stop() {
 	// Создаем контекст с таймаутом для остановки сервера
-	ctx, cancel := context.WithTimeout(context.Background(), a.Config.ShutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), app.Config.ShutdownTimeout)
 	defer cancel()
 
-	err := a.Server.Shutdown(ctx)
+	err := app.diContainer.Server.Shutdown(ctx)
 	if err != nil {
-		log.Printf("❌ Ошибка при остановке сервера: %v\n", err)
+		logger.Info(ctx, fmt.Sprintf("❌ Ошибка при остановке сервера: %v\n", err))
 	}
 
-	log.Println("✅ Сервер остановлен")
+	logger.Info(ctx, "✅ Сервер остановлен")
 }

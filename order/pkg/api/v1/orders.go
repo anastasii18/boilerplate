@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"order/pkg/client/payment"
 	"order/pkg/service"
+	logger "platform/pkg"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -146,7 +146,7 @@ func (a *Api) CancelOrderHandler(ctx context.Context) http.HandlerFunc {
 			return
 		}
 		render.NoContent(w, r)
-		log.Printf("Order with ID '%s' has been successfully cancelled.", orderId)
+		logger.Info(ctx, fmt.Sprintf("Order with ID '%s' has been successfully cancelled.", orderId))
 	}
 }
 

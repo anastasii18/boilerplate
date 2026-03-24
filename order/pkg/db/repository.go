@@ -4,15 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"order/pkg/migrator"
+	logger "platform/pkg"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-
-	"log"
 )
 
 type OrderRepository interface {
@@ -56,7 +56,7 @@ func Migrate(ctx context.Context, db *DB, migrationsDir string) {
 
 	err := migratorRunner.Up()
 	if err != nil {
-		log.Printf("Ошибка миграции базы данных: %v\n", err)
+		logger.Error(ctx, fmt.Sprintf("Ошибка миграции базы данных: %v\n", err))
 		return
 	}
 }
@@ -80,18 +80,18 @@ func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
-		log.Printf("failed to build query: %v\n", err)
+		logger.Error(ctx, fmt.Sprintf("failed to build query: %v\n", err))
 		return err
 	}
 
 	var orderId string
 	err = r.db.QueryRow(ctx, query, args...).Scan(&orderId)
 	if err != nil {
-		log.Printf("failed to insert note: %v\n", err)
+		logger.Error(ctx, fmt.Sprintf("failed to insert order: %v\n", err))
 		return err
 	}
 
-	log.Printf("inserted note with id: %s\n", orderId)
+	logger.Info(ctx, fmt.Sprintf("inserted order with id: %s\n", orderId))
 
 	return nil
 }
@@ -151,17 +151,17 @@ func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transact
 
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
-		log.Printf("failed to build query: %v\n", err)
+		logger.Error(ctx, fmt.Sprintf("failed to build query: %v\n", err))
 		return fmt.Errorf("failed to build query: %v\n", err)
 	}
 
 	res, err := r.db.Exec(ctx, query, args...)
 	if err != nil {
-		log.Printf("failed to update order: %v\n", err)
+		logger.Error(ctx, fmt.Sprintf("failed to update order: %v\n", err))
 		return fmt.Errorf("failed to update order: %v\n", err)
 	}
 
-	log.Printf("updated %d rows", res.RowsAffected())
+	logger.Info(ctx, fmt.Sprintf("updated %d rows", res.RowsAffected()))
 
 	return nil
 }
