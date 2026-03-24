@@ -8,11 +8,12 @@ import (
 	"order/pkg/db"
 	"os"
 	"os/signal"
-	logger "platform/pkg"
+	"platform/pkg/logger"
 	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
 const (
@@ -37,6 +38,12 @@ func main() {
 	}
 	a, err := app.New(ctx, config)
 
+	err = a.Run(ctx, config)
+	if err != nil {
+		logger.Error(ctx, "❌ Ошибка при работе приложения", zap.Error(err))
+		return
+	}
+
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -59,6 +66,10 @@ func initConfig() (*app.Config, error) {
 		"HTTP_PORT":                &config.HttpPort,
 		"SERVER_INVENTORY_ADDRESS": &config.ServerInventoryAddress,
 		"SERVER_PAYMENT_ADDRESS":   &config.ServerPaymentAddress,
+		"ORDER_KAFKA_BROKER":       &config.KafkaBroker,
+		"CONSUME_TOPIC_NAME":       &config.ConsumeTopicName,
+		"PRODUCE_TOPIC_NAME":       &config.ProduceTopicName,
+		"ORDER_CONSUMER_GROUP_ID":  &config.ConsumerGroupId,
 	}
 	for key, target := range secretsMapping {
 		*target = os.Getenv(key)

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	api "order/pkg/api/v1"
@@ -9,8 +10,15 @@ import (
 	"order/pkg/client/payment"
 	"order/pkg/db"
 	"order/pkg/service"
+	"order/pkg/service/consumer"
+	wrappedKafka "platform/pkg/kafka"
+	wrappedKafkaConsumer "platform/pkg/kafka/consumer"
+	"platform/pkg/kafka/producer"
+	wrappedKafkaProducer "platform/pkg/kafka/producer"
+	"platform/pkg/logger"
 	"time"
 
+	"github.com/IBM/sarama"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
@@ -22,6 +30,16 @@ type diContainer struct {
 	OrderService    service.OrderService
 	InventoryClient inventory.Client
 	PaymentClient   payment.Client
+
+	consumerService consumer.ShipAssembledService
+	producerService service.OrderProducerService
+
+	wrappedConsumer wrappedKafka.Consumer
+	wrappedProducer wrappedKafka.Producer
+
+	syncProducer     sarama.SyncProducer
+	consumerGroup    sarama.ConsumerGroup
+	assembledDecoder producer.ShipAssembledDecoder
 }
 
 func NewDiContainer() *diContainer {
@@ -73,7 +91,7 @@ func (d *diContainer) NewServer(ctx context.Context, config *Config) *http.Serve
 }
 
 func (d *diContainer) NewOrderService(ctx context.Context, config *Config) service.OrderService {
-	d.OrderService = service.NewService(d.NewRepo(ctx, config), d.NewInventoryClient(ctx, config))
+	d.OrderService = service.NewService(d.NewRepo(ctx, config), d.NewInventoryClient(ctx, config), d.ProducerService(config.ProduceTopicName, config.KafkaBroker))
 	return d.OrderService
 }
 
@@ -95,4 +113,84 @@ func (d *diContainer) NewPaymentClient(ctx context.Context, config *Config) paym
 	d.PaymentClient = paymentClient
 
 	return d.PaymentClient
+}
+
+func (d *diContainer) ProducerService(topicName, broker string) service.OrderProducerService {
+	if d.producerService == nil {
+		d.producerService = service.NewProducerService(d.WrappedProducer(topicName, broker))
+	}
+	return d.producerService
+}
+
+func (d *diContainer) ConsumerService(topicName, broker, groupId string) consumer.ShipAssembledService {
+	if d.consumerService == nil {
+		d.consumerService = consumer.NewService(d.WrappedConsumer(topicName, broker, groupId), d.ShipAssembledDecoder(), d.OrderService)
+	}
+
+	return d.consumerService
+}
+
+func (d *diContainer) ShipAssembledDecoder() producer.ShipAssembledDecoder {
+	if d.assembledDecoder == nil {
+		d.assembledDecoder = producer.NewShipAssembledDecoder()
+	}
+
+	return d.assembledDecoder
+}
+
+func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) wrappedKafka.Consumer {
+	if d.consumerService == nil {
+		d.wrappedConsumer = wrappedKafkaConsumer.NewConsumer(
+			d.ConsumerGroup(broker, groupId),
+			[]string{topicName},
+			logger.Logger(),
+		)
+	}
+
+	return d.wrappedConsumer
+}
+
+func (d *diContainer) WrappedProducer(topicName, broker string) wrappedKafka.Producer {
+	if d.producerService == nil {
+		d.wrappedProducer = wrappedKafkaProducer.NewProducer(
+			d.SyncProducer(broker),
+			topicName,
+			logger.Logger(),
+		)
+	}
+
+	return d.wrappedProducer
+}
+
+func (d *diContainer) SyncProducer(broker string) sarama.SyncProducer {
+	if d.syncProducer == nil {
+		p, err := sarama.NewSyncProducer(
+			[]string{broker},
+			wrappedKafkaProducer.Config(),
+		)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create sync producer: %s\n", err.Error()))
+		}
+
+		d.syncProducer = p
+	}
+
+	return d.syncProducer
+}
+
+func (d *diContainer) ConsumerGroup(broker, groupId string) sarama.ConsumerGroup {
+	if d.consumerGroup == nil {
+		consumerGroup, err := sarama.NewConsumerGroup(
+			[]string{broker},
+			groupId,
+			wrappedKafkaConsumer.Config(),
+		)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create consumer group: %s\n", err.Error()))
+		}
+
+		d.consumerGroup = consumerGroup
+	}
+
+	return d.consumerGroup
 }

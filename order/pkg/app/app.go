@@ -2,11 +2,14 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
-	logger "platform/pkg"
+	"platform/pkg/logger"
 	"time"
+
+	"github.com/go-faster/errors"
+
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -17,6 +20,10 @@ type Config struct {
 	HttpPort               string
 	ServerInventoryAddress string
 	ServerPaymentAddress   string
+	KafkaBroker            string
+	ProduceTopicName       string
+	ConsumeTopicName       string
+	ConsumerGroupId        string
 }
 
 type App struct {
@@ -75,6 +82,48 @@ func (app *App) initServer(ctx context.Context) error {
 			logger.Info(ctx, fmt.Sprintf("❌ Ошибка запуска сервера: %v\n", err))
 		}
 	}()
+
+	return nil
+}
+
+func (app *App) Run(ctx context.Context, config *Config) error {
+	// Канал для ошибок от компонентов
+	errCh := make(chan error, 2)
+
+	// Контекст для остановки всех горутин
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Консьюмер
+	go func() {
+		if err := app.runConsumer(ctx, config); err != nil {
+			errCh <- errors.Errorf("consumer crashed: %v", err)
+		}
+	}()
+
+	// Ожидание либо ошибки, либо завершения контекста (например, сигнал SIGINT/SIGTERM)
+	select {
+	case <-ctx.Done():
+		logger.Info(ctx, "Shutdown signal received")
+	case err := <-errCh:
+		logger.Error(ctx, "Component crashed, shutting down", zap.Error(err))
+		// Триггерим cancel, чтобы остановить второй компонент
+		cancel()
+		// Дождись завершения всех задач (если есть graceful shutdown внутри)
+		<-ctx.Done()
+		return err
+	}
+
+	return nil
+}
+
+func (app *App) runConsumer(ctx context.Context, config *Config) error {
+	logger.Info(ctx, "🚀 Order Kafka consumer running")
+
+	err := app.diContainer.ConsumerService(config.ConsumeTopicName, config.KafkaBroker, config.ConsumerGroupId).RunConsumer(ctx)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

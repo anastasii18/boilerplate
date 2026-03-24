@@ -25,6 +25,7 @@ const (
 	PENDING_PAYMENT OrderStatus = 0
 	PAID            OrderStatus = 1
 	CANCELLED       OrderStatus = 2
+	COMPLETED       OrderStatus = 3
 )
 
 type OrderPaymentMethod int32
@@ -39,6 +40,23 @@ const (
 
 type PayBody struct {
 	PaymentMethod OrderPaymentMethod `json:"payment_method"`
+}
+
+func (m OrderPaymentMethod) String() string {
+	switch m {
+	case UNKNOWN:
+		return "UNKNOWN"
+	case CARD:
+		return "CARD"
+	case SBP:
+		return "SBP"
+	case CREDIT_CARD:
+		return "CREDIT_CARD"
+	case INVESTOR_MONEY:
+		return "INVESTOR_MONEY"
+	default:
+		return fmt.Sprintf("OrderPaymentMethod(%d)", m)
+	}
 }
 
 func (m *OrderPaymentMethod) UnmarshalJSON(data []byte) error {

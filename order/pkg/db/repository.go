@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"order/pkg/migrator"
-	logger "platform/pkg"
+	"platform/pkg/logger"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -19,6 +19,7 @@ type OrderRepository interface {
 	CreateOrder(ctx context.Context, order *Order) error
 	GetOrder(ctx context.Context, orderUuid string) (*Order, error)
 	UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
+	GetUserUuidForOrder(ctx context.Context, orderUuid string) (*string, error)
 }
 
 type Repository struct {
@@ -123,6 +124,37 @@ func (r *Repository) GetOrder(ctx context.Context, orderUuid string) (*Order, er
 	}
 
 	return &order, nil
+}
+
+func (r *Repository) GetUserUuidForOrder(ctx context.Context, orderUuid string) (*string, error) {
+	builderSelect := sq.Select("user_uuid").
+		From("\"order\"").
+		PlaceholderFormat(sq.Dollar).
+		Where(sq.Eq{"order_uuid": orderUuid}).
+		Limit(1)
+
+	query, args, err := builderSelect.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	row, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	defer row.Close()
+
+	var userUUID *string
+
+	err = r.db.QueryRow(ctx, query, args...).Scan(&userUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("user not found for order: %s", orderUuid)
+		}
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	return userUUID, nil
 }
 
 func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
