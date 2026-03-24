@@ -139,7 +139,7 @@ func (d *diContainer) ShipAssembledDecoder() producer.ShipAssembledDecoder {
 }
 
 func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) wrappedKafka.Consumer {
-	if d.consumerService == nil {
+	if d.wrappedConsumer == nil {
 		d.wrappedConsumer = wrappedKafkaConsumer.NewConsumer(
 			d.ConsumerGroup(broker, groupId),
 			[]string{topicName},
@@ -151,7 +151,7 @@ func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) wrapped
 }
 
 func (d *diContainer) WrappedProducer(topicName, broker string) wrappedKafka.Producer {
-	if d.producerService == nil {
+	if d.wrappedProducer == nil {
 		d.wrappedProducer = wrappedKafkaProducer.NewProducer(
 			d.SyncProducer(broker),
 			topicName,
