@@ -19,12 +19,8 @@ func NewPart(part *db.Part) *Part {
 		for key, value := range part.Metadata {
 			v := &Value{}
 
-			if value.StringVal != nil {
-				v.StringVal = value.StringVal
-			} else if value.IntVal != nil {
+			if value.IntVal != nil {
 				v.IntVal = value.IntVal
-			} else if v.FloatVal != nil {
-				v.FloatVal = v.FloatVal
 			} else if value.BoolVal != nil {
 				v.BoolVal = value.BoolVal
 			}

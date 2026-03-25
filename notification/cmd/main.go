@@ -44,12 +44,13 @@ func gracefulShutdown() {
 func initConfig() (*app.Config, error) {
 	var config app.Config
 	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("failed to load .env: %v", err)
+		return nil, fmt.Errorf("failed to load .env: %w", err)
 	}
 
 	secretsMapping := map[string]*string{
 		"ORDER_KAFKA_BROKER":      &config.KafkaBroker,
 		"ORDER_CONSUMER_GROUP_ID": &config.GroupId,
+		"TELEGRAM_BOT_TOKEN":      &config.TelegramBotToken,
 	}
 	for key, target := range secretsMapping {
 		*target = os.Getenv(key)

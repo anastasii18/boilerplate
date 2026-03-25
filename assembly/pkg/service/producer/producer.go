@@ -2,8 +2,9 @@ package producer
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
-	"math/rand"
+	"math/big"
 	orderProducer "order/pkg/service"
 	"platform/pkg/kafka"
 	"platform/pkg/logger"
@@ -58,7 +59,12 @@ func (p *producer) ProduceOrderPaid(ctx context.Context, event orderProducer.Ord
 
 func simulateAssembly(ctx context.Context, orderUuid string) {
 	// Имитация работы сборочного цеха
-	duration := time.Duration(10+rand.Intn(10)) * time.Second
+	n, err := rand.Int(rand.Reader, big.NewInt(10))
+	if err != nil {
+		logger.Error(ctx, "failed to generate random number", zap.Error(err))
+		n = big.NewInt(5)
+	}
+	duration := time.Duration(10+n.Int64()) * time.Second
 	logger.Info(ctx, "Starting assembly simulation", zap.String("order_uuid", orderUuid), zap.Duration("estimated_duration", duration))
 
 	select {

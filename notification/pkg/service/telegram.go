@@ -15,9 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// вставить значение для демонстрации
-const chatID = 1
-
 //go:embed templates/order_notification.tmpl
 var templateOrder embed.FS
 
@@ -40,55 +37,54 @@ type assembledTemplateData struct {
 var orderTemplate = template.Must(template.ParseFS(templateOrder, "templates/order_notification.tmpl"))
 var assembledTemplate = template.Must(template.ParseFS(templateAssembled, "templates/assembled_notification.tmpl"))
 
-type TelegramService interface {
-	SendOrderPaidNotification(ctx context.Context, orderPaid orderService.OrderPaid) error
-	SendAssembledNotification(ctx context.Context, shipAssembled assemblyProducer.ShipAssembled) error
-}
-
-type service struct {
+type TGService struct {
 	telegramClient telegram.TelegramClient
 }
 
+func (s *TGService) SendMessage(ctx context.Context, msg string, chatID int64) error {
+	return s.telegramClient.SendMessage(ctx, chatID, msg)
+}
+
 // NewService создает новый Telegram сервис
-func NewService(telegramClient telegram.TelegramClient) *service {
-	return &service{
+func NewService(telegramClient telegram.TelegramClient) *TGService {
+	return &TGService{
 		telegramClient: telegramClient,
 	}
 }
 
 // SendOrderPaidNotification отправляет уведомление об оплате заказа
-func (s *service) SendOrderPaidNotification(ctx context.Context, orderPaid orderService.OrderPaid) error {
+func (s *TGService) SendOrderPaidNotification(ctx context.Context, orderPaid orderService.OrderPaid, chatID int64) error {
 	message, err := s.buildOrderMessage(orderPaid)
 	if err != nil {
 		return err
 	}
 
-	err = s.telegramClient.SendMessage(ctx, chatID, message)
+	err = s.SendMessage(ctx, message, chatID)
 	if err != nil {
 		return err
 	}
 
-	logger.Info(ctx, "Telegram message sent to chat", zap.Int("chat_id", chatID), zap.String("message", message))
+	logger.Info(ctx, "Telegram message sent to chat", zap.Int("chat_id", int(chatID)), zap.String("message", message))
 	return nil
 }
 
 // SendAssembledNotification отправляет уведомление о сборке заказа
-func (s *service) SendAssembledNotification(ctx context.Context, shipAssembled assemblyProducer.ShipAssembled) error {
+func (s *TGService) SendAssembledNotification(ctx context.Context, shipAssembled assemblyProducer.ShipAssembled, chatID int64) error {
 	message, err := s.buildAssembledMessage(shipAssembled)
 	if err != nil {
 		return err
 	}
 
-	err = s.telegramClient.SendMessage(ctx, chatID, message)
+	err = s.SendMessage(ctx, message, chatID)
 	if err != nil {
 		return err
 	}
 
-	logger.Info(ctx, "Telegram message sent to chat", zap.Int("chat_id", chatID), zap.String("message", message))
+	logger.Info(ctx, "Telegram message sent to chat", zap.Int("chat_id", int(chatID)), zap.String("message", message))
 	return nil
 }
 
-func (s *service) buildOrderMessage(orderPaid orderService.OrderPaid) (string, error) {
+func (s *TGService) buildOrderMessage(orderPaid orderService.OrderPaid) (string, error) {
 	safePaymentMethod := strings.ReplaceAll(orderPaid.PaymentMethod, "_", " ")
 
 	data := orderPaidTemplateData{
@@ -106,7 +102,7 @@ func (s *service) buildOrderMessage(orderPaid orderService.OrderPaid) (string, e
 	return buf.String(), nil
 }
 
-func (s *service) buildAssembledMessage(shipAssembled assemblyProducer.ShipAssembled) (string, error) {
+func (s *TGService) buildAssembledMessage(shipAssembled assemblyProducer.ShipAssembled) (string, error) {
 	data := assembledTemplateData{
 		OrderUuid:    shipAssembled.OrderUuid,
 		BuildTimeSec: shipAssembled.BuildTimeSec,

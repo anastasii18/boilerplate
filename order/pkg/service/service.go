@@ -29,7 +29,10 @@ func NewService(orderRepository db.OrderRepository, inventoryClient inventory.Cl
 }
 
 func (s Service) CreateOrder(ctx context.Context, order *Order) error {
-	parts, _ := s.inventoryClient.GetInventoryPartsForIDs(ctx, order.PartUuids)
+	parts, err := s.inventoryClient.GetInventoryPartsForIDs(ctx, order.PartUuids)
+	if err != nil {
+		return err
+	}
 
 	// Проверяет, что все детали существуют. Если хотя бы одной нет — возвращает ошибку
 	if len(order.PartUuids) != len(parts) {
@@ -51,7 +54,7 @@ func (s Service) CreateOrder(ctx context.Context, order *Order) error {
 	order.OrderUuid = uuid.New().String()
 	order.Status = PENDING_PAYMENT
 
-	err := s.repo.CreateOrder(ctx, OrderToRepoModel(order))
+	err = s.repo.CreateOrder(ctx, OrderToRepoModel(order))
 	if err != nil {
 		return err
 	}

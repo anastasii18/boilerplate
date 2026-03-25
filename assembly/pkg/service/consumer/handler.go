@@ -15,7 +15,10 @@ func (s *service) OrderHandler(ctx context.Context, msg kafka.Message) error {
 		logger.Error(ctx, "Failed to decode orderPaidDecoder", zap.Error(err))
 		return err
 	}
-	time.Sleep(10 * time.Second)
+
+	if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+		return err
+	}
 
 	logger.Info(ctx, "Processing message",
 		zap.String("topic", msg.Topic),
@@ -32,4 +35,16 @@ func (s *service) OrderHandler(ctx context.Context, msg kafka.Message) error {
 	}
 
 	return nil
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

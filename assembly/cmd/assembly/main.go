@@ -41,7 +41,7 @@ func main() {
 func initConfig() (*app.Config, error) {
 	var config app.Config
 	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("failed to load .env: %v", err)
+		return nil, fmt.Errorf("failed to load .env: %w", err)
 	}
 
 	secretsMapping := map[string]*string{

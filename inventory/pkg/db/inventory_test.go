@@ -1,17 +1,39 @@
 package db
 
 import (
+	"context"
+	"os"
 	"reflect"
 	"testing"
 )
 
-var r = NewRepository().Seed()
-var oneId = "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-var one = r.data[oneId]
-var twoId = "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
-var two = r.data[twoId]
-var threeId = "29a9ab94-c814-4828-9a02-b96598dbe299"
-var three = r.data[threeId]
+var (
+	ctx context.Context
+	r   *Repository
+
+	oneId   = "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
+	twoId   = "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
+	threeId = "29a9ab94-c814-4828-9a02-b96598dbe299"
+
+	one   *Part
+	two   *Part
+	three *Part
+)
+
+func TestMain(m *testing.M) {
+	ctx = context.Background()
+	database, _ := NewDB(ctx, "mongodb://user:pswrd@localhost:27017/inventory?authSource=admin", "test")
+	r = NewRepository(database)
+	r.Seed(ctx)
+
+	one, _ = r.GetPart(ctx, oneId)
+	two, _ = r.GetPart(ctx, twoId)
+	three, _ = r.GetPart(ctx, threeId)
+
+	// Запуск тестов
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestGetParts(t *testing.T) {
 	type args struct {
@@ -64,7 +86,7 @@ func TestGetParts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			if got := r.GetParts(tt.args.filter); !reflect.DeepEqual(got, tt.want) {
+			if got, _ := r.GetParts(ctx, tt.args.filter); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetParts() = %v, want %v", got, tt.want)
 			}
 		})
@@ -97,7 +119,7 @@ func TestGetPart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			got, err := r.GetPart(tt.args.id)
+			got, err := r.GetPart(ctx, tt.args.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetPart() error = %v, wantErr %v", err, tt.wantErr)
 				return

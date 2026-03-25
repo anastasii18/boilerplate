@@ -181,7 +181,11 @@ func (r *Repository) GetParts(ctx context.Context, filter PartSearch) (map[strin
 	if err != nil {
 		return nil, fmt.Errorf("ошибка Find: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		if closeErr := cursor.Close(ctx); closeErr != nil {
+			log.Printf("failed to close mongo cursor: %v", closeErr)
+		}
+	}()
 
 	// Собираем результат в map
 	result := make(map[string]*Part)

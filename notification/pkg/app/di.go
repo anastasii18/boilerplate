@@ -15,15 +15,10 @@ import (
 	"github.com/go-telegram/bot"
 )
 
-const (
-	// вставить значение для демонстрации
-	telegramBotToken = ""
-)
-
 type diContainer struct {
 	telegramClient  telegram.TelegramClient
 	telegramBot     *bot.Bot
-	telegramService service.TelegramService
+	telegramService *service.TGService
 
 	assembledDecoder producer.ShipAssembledDecoder
 	orderPaidDecoder wrappedKafkaConsumer.OrderPaidDecoder
@@ -37,27 +32,27 @@ func NewDiContainer() *diContainer {
 	return &diContainer{}
 }
 
-func (d *diContainer) TelegramService(ctx context.Context) service.TelegramService {
+func (d *diContainer) TelegramService(ctx context.Context, token string) *service.TGService {
 	if d.telegramService == nil {
 		d.telegramService = service.NewService(
-			d.TelegramClient(ctx),
+			d.TelegramClient(ctx, token),
 		)
 	}
 
 	return d.telegramService
 }
 
-func (d *diContainer) TelegramClient(ctx context.Context) telegram.TelegramClient {
+func (d *diContainer) TelegramClient(ctx context.Context, token string) telegram.TelegramClient {
 	if d.telegramClient == nil {
-		d.telegramClient = telegram.NewClient(d.TelegramBot(ctx))
+		d.telegramClient = telegram.NewClient(d.TelegramBot(ctx, token))
 	}
 
 	return d.telegramClient
 }
 
-func (d *diContainer) TelegramBot(ctx context.Context) *bot.Bot {
+func (d *diContainer) TelegramBot(ctx context.Context, token string) *bot.Bot {
 	if d.telegramBot == nil {
-		b, err := bot.New(telegramBotToken)
+		b, err := bot.New(token)
 		if err != nil {
 			panic(fmt.Sprintf("failed to create telegram bot: %s\n", err.Error()))
 		}
@@ -68,13 +63,13 @@ func (d *diContainer) TelegramBot(ctx context.Context) *bot.Bot {
 	return d.telegramBot
 }
 
-func (d *diContainer) NotificationConsumer(ctx context.Context, broker, groupId string, topicName []string) consumer.ShipAndOrderNotificationService {
+func (d *diContainer) NotificationConsumer(ctx context.Context, broker, groupId, token string, topicName []string) consumer.ShipAndOrderNotificationService {
 	if d.consumer == nil {
 		d.consumer = consumer.NewService(
 			d.WrappedConsumer(topicName, broker, groupId),
 			d.ShipAssembledDecoder(),
 			d.OrderPaidDecoder(),
-			d.TelegramService(ctx),
+			d.TelegramService(ctx, token),
 		)
 	}
 

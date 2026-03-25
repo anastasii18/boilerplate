@@ -2,7 +2,7 @@ package consumer
 
 import (
 	"context"
-	notificationService "notification/pkg/service"
+	notifo "notification/pkg/service"
 	"platform/pkg/kafka"
 	"platform/pkg/kafka/consumer"
 	"platform/pkg/kafka/producer"
@@ -21,10 +21,10 @@ type service struct {
 	notificationConsumer kafka.Consumer
 	shipAssembledDecoder producer.ShipAssembledDecoder
 	orderPaidDecoder     consumer.OrderPaidDecoder
-	telegramService      notificationService.TelegramService
+	telegramService      *notifo.TGService
 }
 
-func NewService(notificationConsumer kafka.Consumer, shipAssembledDecoder producer.ShipAssembledDecoder, orderPaidDecoder consumer.OrderPaidDecoder, telegramService notificationService.TelegramService) *service {
+func NewService(notificationConsumer kafka.Consumer, shipAssembledDecoder producer.ShipAssembledDecoder, orderPaidDecoder consumer.OrderPaidDecoder, telegramService *notifo.TGService) *service {
 	return &service{
 		notificationConsumer: notificationConsumer,
 		shipAssembledDecoder: shipAssembledDecoder,

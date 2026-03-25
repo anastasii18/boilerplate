@@ -14,7 +14,6 @@ import (
 	wrappedKafka "platform/pkg/kafka"
 	wrappedKafkaConsumer "platform/pkg/kafka/consumer"
 	"platform/pkg/kafka/producer"
-	wrappedKafkaProducer "platform/pkg/kafka/producer"
 	"platform/pkg/logger"
 	"time"
 
@@ -152,7 +151,7 @@ func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) wrapped
 
 func (d *diContainer) WrappedProducer(topicName, broker string) wrappedKafka.Producer {
 	if d.wrappedProducer == nil {
-		d.wrappedProducer = wrappedKafkaProducer.NewProducer(
+		d.wrappedProducer = producer.NewProducer(
 			d.SyncProducer(broker),
 			topicName,
 			logger.Logger(),
@@ -166,7 +165,7 @@ func (d *diContainer) SyncProducer(broker string) sarama.SyncProducer {
 	if d.syncProducer == nil {
 		p, err := sarama.NewSyncProducer(
 			[]string{broker},
-			wrappedKafkaProducer.Config(),
+			producer.Config(),
 		)
 		if err != nil {
 			panic(fmt.Sprintf("failed to create sync producer: %s\n", err.Error()))

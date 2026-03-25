@@ -25,7 +25,7 @@ type OrderPaid struct {
 	OrderUuid       string  `json:"order_uuid"`       // Идентификатор оплаченного заказа
 	UserUuid        string  `json:"user_uuid"`        // Идентификатор пользователя
 	TransactionUuid *string `json:"transaction_uuid"` // Идентификатор транзакции, сгенерированный в результате оплаты
-	PaymentMethod   string  `json:"payment_method"`   //Способ оплаты
+	PaymentMethod   string  `json:"payment_method"`   // Способ оплаты
 }
 
 func (p *producer) ProduceOrderPaid(ctx context.Context, event OrderPaid) error {

@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	ShipAssembledTopic = "ship.assembled"
-	OrderPaidTopic     = "order.paid"
+	ShipAssembledTopic       = "ship.assembled"
+	OrderPaidTopic           = "order.paid"
+	ChatID             int64 = 1
 )
 
 func (s *service) OrderHandler(ctx context.Context, msg kafka.Message) error {
@@ -40,7 +41,7 @@ func (s *service) orderPaidProcess(ctx context.Context, msg kafka.Message) error
 		zap.String("event_uuid", event.EventUuid),
 		zap.String("user_uuid", event.UserUuid),
 	)
-	err = s.telegramService.SendOrderPaidNotification(ctx, event)
+	err = s.telegramService.SendOrderPaidNotification(ctx, event, ChatID)
 	if err != nil {
 		logger.Error(ctx, "Failed to send order paid notification", zap.Error(err))
 		return err
@@ -65,7 +66,7 @@ func (s *service) shipAssembledProcess(ctx context.Context, msg kafka.Message) e
 		zap.String("user_uuid", event.UserUuid),
 	)
 
-	err = s.telegramService.SendAssembledNotification(ctx, event)
+	err = s.telegramService.SendAssembledNotification(ctx, event, ChatID)
 	if err != nil {
 		logger.Error(ctx, "Failed to send order paid notification", zap.Error(err))
 		return err

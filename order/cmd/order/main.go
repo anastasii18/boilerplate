@@ -36,7 +36,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a, err := app.New(ctx, config)
+
+	var a *app.App
+	a, err = app.New(ctx, config)
+	if err != nil {
+		logger.Error(ctx, "❌ Ошибка при создании приложения", zap.Error(err))
+		return
+	}
 
 	err = a.Run(ctx, config)
 	if err != nil {
@@ -57,7 +63,7 @@ func main() {
 func initConfig() (*app.Config, error) {
 	var config app.Config
 	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("failed to load .env: %v", err)
+		return nil, fmt.Errorf("failed to load .env: %w", err)
 	}
 
 	secretsMapping := map[string]*string{

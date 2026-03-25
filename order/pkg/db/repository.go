@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"order/pkg/migrator"
-	"platform/pkg/logger"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -34,7 +33,7 @@ func NewDB(ctx context.Context, dbURI string) (*DB, error) {
 	// Создаем пул соединений с базой данных
 	pool, err := pgxpool.New(ctx, dbURI)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v\n", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	err = pool.Ping(ctx)
@@ -57,7 +56,7 @@ func Migrate(ctx context.Context, db *DB, migrationsDir string) {
 
 	err := migratorRunner.Up()
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("Ошибка миграции базы данных: %v\n", err))
+		log.Fatalf("Ошибка миграции базы данных: %v\n", err)
 		return
 	}
 }
@@ -81,18 +80,18 @@ func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to build query: %v\n", err))
+		log.Fatalf("failed to build query: %v\n", err)
 		return err
 	}
 
 	var orderId string
 	err = r.db.QueryRow(ctx, query, args...).Scan(&orderId)
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to insert order: %v\n", err))
+		log.Fatalf("failed to insert order: %v\n", err)
 		return err
 	}
 
-	logger.Info(ctx, fmt.Sprintf("inserted order with id: %s\n", orderId))
+	log.Printf("inserted order with id: %s\n", orderId)
 
 	return nil
 }
@@ -183,17 +182,15 @@ func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transact
 
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to build query: %v\n", err))
-		return fmt.Errorf("failed to build query: %v\n", err)
+		return fmt.Errorf("failed to build query: %w", err)
 	}
 
 	res, err := r.db.Exec(ctx, query, args...)
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to update order: %v\n", err))
-		return fmt.Errorf("failed to update order: %v\n", err)
+		return fmt.Errorf("failed to update order: %w", err)
 	}
 
-	logger.Info(ctx, fmt.Sprintf("updated %d rows", res.RowsAffected()))
+	log.Printf("updated %d rows", res.RowsAffected())
 
 	return nil
 }
