@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "/pkg/proto/auth/v1;auth_v1";
+
+service AuthService {
+  // Регистрация пользователя
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  // Авторизация пользователя
+  rpc Login(LoginRequest) returns (LoginResponse);
+  // Проверка сессии
+  rpc Whoami(WhoamiRequest) returns (WhoamiResponse);
+  // Получение информации о пользователе
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+
+// Запрос на регистрацию пользователя
+message RegisterRequest {
+  // Логин пользователя
+  string login = 1;
+  // Пароль пользователя
+  string password = 2;
+  // Email пользователя
+  string email = 3;
+  //Каналы, по которым пользователь хочет получать уведомления
+  repeated NotificationMethod notification_methods = 4;
+}
+
+// Способ уведомления
+message NotificationMethod {
+  // Имя провайдера (например, `telegram`, `email`, `push`)
+  string provider_name = 1;
+  // Адрес получателя — email, ID чата и т.д.
+  string target = 2;
+}
+
+// Ответ на регистрацию пользователя
+message RegisterResponse {
+  // UUID зарегистрированного пользователя
+  string user_uuid = 1;
+}
+
+// Запрос на авторизацию
+message LoginRequest {
+  // Логин пользователя
+  string login = 1;
+  // Пароль пользователя
+  string password = 2;
+}
+
+// Ответ на успешную авторизацию
+message LoginResponse {
+  // Идентификатор сессии
+  string session_uuid = 1;
+}
+
+// Запрос на проверку сессии
+message WhoamiRequest {
+  // Идентификатор сессии
+  string session_uuid = 1;
+}
+
+// Ответ на проверку сессии
+message WhoamiResponse {
+  // UUID пользователя
+  string user_uuid = 1;
+  // Логин пользователя
+  string login = 2;
+  // Email пользователя
+  string email = 3;
+}
+
+// Запрос на получение информации о пользователе
+message GetUserRequest {
+  // UUID пользователя
+  string user_uuid = 1;
+}
+
+// Информация о пользователе
+message GetUserResponse {
+  // UUID пользователя
+  string user_uuid = 1;
+  // Логин пользователя
+  string login = 2;
+  // Email пользователя
+  string email = 3;
+  // Список каналов уведомлений пользователя
+  repeated NotificationMethod notification_methods = 4;
+}

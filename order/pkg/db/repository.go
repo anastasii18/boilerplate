@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"order/pkg/migrator"
+	"platform/migrator"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
