@@ -7,3 +7,10 @@ type User struct {
 	Password            string            `json:"hashed_password" db:"hashed_password"`
 	NotificationMethods map[string]string `json:"notification_methods"`
 }
+
+// UserRedisView - модель для хранения в Redis hash map
+type UserRedisView struct {
+	UserUuid string `redis:"user_uuid"`
+	Login    string `redis:"login"`
+	Email    string `redis:"email"`
+}

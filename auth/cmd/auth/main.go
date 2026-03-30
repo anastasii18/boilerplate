@@ -6,9 +6,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -46,7 +49,8 @@ func main() {
 
 func initConfig() (*app.Config, error) {
 	var config app.Config
-	if err := godotenv.Load(); err != nil {
+	err := godotenv.Load()
+	if err != nil {
 		return nil, fmt.Errorf("failed to load .env: %w", err)
 	}
 
@@ -54,10 +58,34 @@ func initConfig() (*app.Config, error) {
 		"DB_URI":         &config.DbUri,
 		"GRPC_PORT":      &config.GrpcPort,
 		"MIGRATIONS_DIR": &config.MigrationsDir,
+		"REDIS_HOST":     &config.RedisHost,
+		"REDIS_PORT":     &config.RedisPort,
 	}
+
+	config.RedisMaxIdle, err = strconv.Atoi(os.Getenv("REDIS_MAX_IDLE"))
+	if err != nil {
+		return nil, err
+	}
+
+	config.RedisCacheTTL, err = time.ParseDuration(os.Getenv("REDIS_CACHE_TTL"))
+	if err != nil {
+		return nil, err
+	}
+
+	config.RedisIdleTimeout, err = time.ParseDuration(os.Getenv("REDIS_IDLE_TIMEOUT"))
+	if err != nil {
+		return nil, err
+	}
+
+	config.RedisConnectionTimeout, err = time.ParseDuration(os.Getenv("REDIS_CONNECTION_TIMEOUT"))
+	if err != nil {
+		return nil, err
+	}
+
 	for key, target := range secretsMapping {
 		*target = os.Getenv(key)
 	}
+	config.RedisAddress = net.JoinHostPort(config.RedisHost, config.RedisPort)
 
 	return &config, nil
 }

@@ -298,9 +298,7 @@ func (x *LoginResponse) GetSessionUuid() string {
 
 // Запрос на проверку сессии
 type WhoamiRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Идентификатор сессии
-	SessionUuid   string `protobuf:"bytes,1,opt,name=session_uuid,json=sessionUuid,proto3" json:"session_uuid,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -333,13 +331,6 @@ func (x *WhoamiRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use WhoamiRequest.ProtoReflect.Descriptor instead.
 func (*WhoamiRequest) Descriptor() ([]byte, []int) {
 	return file_auth_v1_auth_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *WhoamiRequest) GetSessionUuid() string {
-	if x != nil {
-		return x.SessionUuid
-	}
-	return ""
 }
 
 // Ответ на проверку сессии
@@ -544,9 +535,8 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x05login\x18\x01 \x01(\tR\x05login\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"2\n" +
 	"\rLoginResponse\x12!\n" +
-	"\fsession_uuid\x18\x01 \x01(\tR\vsessionUuid\"2\n" +
-	"\rWhoamiRequest\x12!\n" +
-	"\fsession_uuid\x18\x01 \x01(\tR\vsessionUuid\"Y\n" +
+	"\fsession_uuid\x18\x01 \x01(\tR\vsessionUuid\"\x0f\n" +
+	"\rWhoamiRequest\"Y\n" +
 	"\x0eWhoamiResponse\x12\x1b\n" +
 	"\tuser_uuid\x18\x01 \x01(\tR\buserUuid\x12\x14\n" +
 	"\x05login\x18\x02 \x01(\tR\x05login\x12\x14\n" +

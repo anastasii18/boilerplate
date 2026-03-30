@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"order/pkg"
 	api "order/pkg/api/v1"
 	"order/pkg/client/inventory"
 	"order/pkg/client/payment"
@@ -60,6 +61,7 @@ func (d *diContainer) NewServer(ctx context.Context, config *Config) *http.Serve
 	r := chi.NewRouter()
 
 	// Добавляем middleware
+	r.Use(pkg.AuthMiddleWare)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
@@ -69,13 +71,13 @@ func (d *diContainer) NewServer(ctx context.Context, config *Config) *http.Serve
 	// Определяем маршруты
 	r.Route("/api/v1/orders", func(r chi.Router) {
 		// Получить заказ по UUID
-		r.Get("/{order_uuid}", a.GetOrderHandler(ctx))
+		r.Get("/{order_uuid}", a.GetOrderHandler())
 		// Создание заказа
-		r.Post("/", a.CreateOrderHandler(ctx))
+		r.Post("/", a.CreateOrderHandler())
 		// Оплата заказа
-		r.Post("/{order_uuid}/pay", a.PayOrderHandler(ctx, d.NewPaymentClient(ctx, config)))
+		r.Post("/{order_uuid}/pay", a.PayOrderHandler(d.NewPaymentClient(config)))
 		// Отменить заказ
-		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler(ctx))
+		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler())
 	})
 
 	d.Server = &http.Server{
@@ -90,11 +92,11 @@ func (d *diContainer) NewServer(ctx context.Context, config *Config) *http.Serve
 }
 
 func (d *diContainer) NewOrderService(ctx context.Context, config *Config) service.OrderService {
-	d.OrderService = service.NewService(d.NewRepo(ctx, config), d.NewInventoryClient(ctx, config), d.ProducerService(config.ProduceTopicName, config.KafkaBroker))
+	d.OrderService = service.NewService(d.NewRepo(ctx, config), d.NewInventoryClient(config), d.ProducerService(config.ProduceTopicName, config.KafkaBroker))
 	return d.OrderService
 }
 
-func (d *diContainer) NewInventoryClient(ctx context.Context, config *Config) inventory.Client {
+func (d *diContainer) NewInventoryClient(config *Config) inventory.Client {
 	inventoryClient, err := inventory.NewClient(config.ServerInventoryAddress)
 	if err != nil {
 		panic(err)
@@ -104,7 +106,7 @@ func (d *diContainer) NewInventoryClient(ctx context.Context, config *Config) in
 	return d.InventoryClient
 }
 
-func (d *diContainer) NewPaymentClient(ctx context.Context, config *Config) payment.Client {
+func (d *diContainer) NewPaymentClient(config *Config) payment.Client {
 	paymentClient, err := payment.NewClient(config.ServerPaymentAddress)
 	if err != nil {
 		panic(err)

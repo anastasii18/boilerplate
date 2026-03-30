@@ -6,14 +6,22 @@ import (
 	"log"
 	"net"
 	"platform/pkg/logger"
+	"time"
 
 	"google.golang.org/grpc/reflection"
 )
 
 type Config struct {
-	GrpcPort      string
-	DbUri         string
-	MigrationsDir string
+	GrpcPort               string
+	DbUri                  string
+	MigrationsDir          string
+	RedisCacheTTL          time.Duration
+	RedisMaxIdle           int
+	RedisIdleTimeout       time.Duration
+	RedisConnectionTimeout time.Duration
+	RedisAddress           string
+	RedisHost              string
+	RedisPort              string
 }
 
 type App struct {
@@ -68,7 +76,7 @@ func (a *App) Start() {
 		log.Printf("failed to listen: %v\n", err)
 		return
 	}
-	a.DiContainer.RegisterGRPCServices()
+	a.DiContainer.RegisterGRPCServices(a.Config)
 	// Включаем рефлексию для отладки
 	reflection.Register(a.DiContainer.Server)
 

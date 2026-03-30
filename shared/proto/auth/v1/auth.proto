@@ -57,8 +57,6 @@ message LoginResponse {
 
 // Запрос на проверку сессии
 message WhoamiRequest {
-  // Идентификатор сессии
-  string session_uuid = 1;
 }
 
 // Ответ на проверку сессии

@@ -1,9 +1,13 @@
 package grpc
 
 import (
+	"auth/pkg/db"
 	"auth/pkg/service"
 	"context"
 	authV1 "shared/pkg/proto/auth/v1"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Api struct {
@@ -53,5 +57,18 @@ func (a *Api) GetUser(ctx context.Context, request *authV1.GetUserRequest) (*aut
 		Login:               user.Login,
 		Email:               user.Email,
 		NotificationMethods: NotificationMethodsFomMap(user.NotificationMethods),
+	}, nil
+}
+
+func (a *Api) Whoami(ctx context.Context, _ *authV1.WhoamiRequest) (*authV1.WhoamiResponse, error) {
+	userView, ok := ctx.Value(UserContextKey).(db.UserRedisView)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get user from context")
+	}
+
+	return &authV1.WhoamiResponse{
+		UserUuid: userView.UserUuid,
+		Login:    userView.Login,
+		Email:    userView.Email,
 	}, nil
 }

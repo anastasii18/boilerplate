@@ -220,7 +220,7 @@ tasks:
     dir: deploy/compose/core
     cmds:
       - echo "[task] 🛑 Останавливаем core контейнеры"
-      - docker compose down --volumes
+      - docker compose down
 
   up-inventory:
     desc: Поднять Inventory сервис и все его зависимости
@@ -234,7 +234,7 @@ tasks:
     dir: deploy/compose/inventory
     cmds:
       - echo "[task] 🛑 Останавливаем Inventory с зависимостями"
-      - docker compose down --volumes
+      - docker compose down
 
   up-order:
     desc: Поднять Order сервис и все его зависимости
@@ -248,7 +248,7 @@ tasks:
     dir: deploy/compose/order
     cmds:
       - echo "[task] 🛑 Останавливаем Order с зависимостями"
-      - docker compose down --volumes
+      - docker compose down
 
   up-all:
     desc: Поднять все сервисы по очереди вместе с зависимостями

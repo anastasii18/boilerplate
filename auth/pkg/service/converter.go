@@ -22,6 +22,14 @@ func UserToRepoModel(user User) *db.User {
 	}
 }
 
+func UserToRedisView(user *User) db.UserRedisView {
+	return db.UserRedisView{
+		UserUuid: Val(user.UserUuid),
+		Login:    user.Login,
+		Email:    user.Email,
+	}
+}
+
 func Val[T any, P *T](p P) T {
 	if p != nil {
 		return *p

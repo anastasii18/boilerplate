@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"platform/migrator"
+	"platform/pkg/migrator"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -24,6 +24,7 @@ type AuthRepository interface {
 	Register(ctx context.Context, user *User) (*string, error)
 	Login(ctx context.Context, user *User) (*string, error)
 	GetUserByUuid(ctx context.Context, userUuid string) (*User, error)
+	GetUserByLogin(ctx context.Context, login string) (*User, error)
 }
 
 type Repository struct {
@@ -167,7 +168,6 @@ func (r *Repository) Login(ctx context.Context, user *User) (*string, error) {
 		return nil, ErrInvalidCredentials
 	}
 
-	// сохранять в redis
 	session_uuid := uuid.New().String()
 	return Ptr(session_uuid), nil
 }

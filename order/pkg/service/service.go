@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"order/pkg"
 	"order/pkg/client/inventory"
 	"order/pkg/db"
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/metadata"
 )
 
 type OrderService interface {
@@ -29,6 +31,7 @@ func NewService(orderRepository db.OrderRepository, inventoryClient inventory.Cl
 }
 
 func (s Service) CreateOrder(ctx context.Context, order *Order) error {
+	ctx = addSessionUuid(ctx)
 	parts, err := s.inventoryClient.GetInventoryPartsForIDs(ctx, order.PartUuids)
 	if err != nil {
 		return err
@@ -95,4 +98,14 @@ func (s Service) UpdateOrder(ctx context.Context, orderUuid string, transactionU
 	}
 
 	return err
+}
+
+func addSessionUuid(ctx context.Context) context.Context {
+	val := ctx.Value(pkg.SessionUUIDKey)
+
+	if str, ok := val.(string); ok && str != "" {
+		return metadata.AppendToOutgoingContext(ctx, "session-uuid", str)
+	}
+
+	return ctx
 }

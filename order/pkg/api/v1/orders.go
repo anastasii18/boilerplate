@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,8 +25,9 @@ func New(service service.OrderService) *Api {
 }
 
 // Создаёт новый заказ на основе выбранных пользователем деталей.
-func (a *Api) CreateOrderHandler(ctx context.Context) http.HandlerFunc {
+func (a *Api) CreateOrderHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		// Декодируем данные из тела запроса
 		var orderCreate service.Order
 		if err := json.NewDecoder(r.Body).Decode(&orderCreate); err != nil {
@@ -55,8 +55,9 @@ func (a *Api) CreateOrderHandler(ctx context.Context) http.HandlerFunc {
 }
 
 // Возвращает информацию о заказе
-func (a *Api) GetOrderHandler(ctx context.Context) http.HandlerFunc {
+func (a *Api) GetOrderHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		orderId := chi.URLParam(r, urlParam)
 		if orderId == "" {
 			http.Error(w, "OrderID parameter is required", http.StatusBadRequest)
@@ -74,8 +75,9 @@ func (a *Api) GetOrderHandler(ctx context.Context) http.HandlerFunc {
 }
 
 // Проводит оплату ранее созданного заказа.
-func (a *Api) PayOrderHandler(ctx context.Context, paymentClient payment.Client) http.HandlerFunc {
+func (a *Api) PayOrderHandler(paymentClient payment.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		orderId := chi.URLParam(r, urlParam)
 		if orderId == "" {
 			http.Error(w, "OrderID parameter is required", http.StatusBadRequest)
@@ -116,8 +118,9 @@ func (a *Api) PayOrderHandler(ctx context.Context, paymentClient payment.Client)
 }
 
 // Отменяет заказ
-func (a *Api) CancelOrderHandler(ctx context.Context) http.HandlerFunc {
+func (a *Api) CancelOrderHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		orderId := chi.URLParam(r, urlParam)
 		if orderId == "" {
 			http.Error(w, "OrderID parameter is required.", http.StatusBadRequest)
