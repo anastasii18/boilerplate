@@ -89,15 +89,13 @@ func (r *Repository) Register(ctx context.Context, user *User) (*string, error) 
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
-		log.Fatalf("failed to build query: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to build query: %v\n", err)
 	}
 
 	var userUuid *string
 	err = r.db.QueryRow(ctx, query, args...).Scan(&userUuid)
 	if err != nil {
-		log.Fatalf("failed to insert user: %v\n", err)
-		return userUuid, err
+		return userUuid, fmt.Errorf("failed to insert user: %v\n", err)
 	}
 
 	log.Printf("inserted user with id: %s\n", userUuid)

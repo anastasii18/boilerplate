@@ -75,7 +75,7 @@ func (a *Api) GetOrderHandler() http.HandlerFunc {
 }
 
 // Проводит оплату ранее созданного заказа.
-func (a *Api) PayOrderHandler(paymentClient payment.Client) http.HandlerFunc {
+func (a *Api) PayOrderHandler(paymentClient *payment.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		orderId := chi.URLParam(r, urlParam)

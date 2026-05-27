@@ -65,7 +65,10 @@ func (app *App) initLogger(ctx context.Context) error {
 
 func (app *App) initTelegramBot(ctx context.Context) error {
 	// Получаем бота из DI контейнера
-	telegramBot := app.diContainer.TelegramBot(ctx, app.config.TelegramBotToken)
+	telegramBot, err := app.diContainer.TelegramBot(ctx, app.config.TelegramBotToken)
+	if err != nil {
+		return err
+	}
 
 	// Регистрируем обработчик для активации бота
 	telegramBot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, func(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -92,7 +95,10 @@ func (app *App) initTelegramBot(ctx context.Context) error {
 // Инициализация и запуск консьюмера
 func (app *App) initConsumer(ctx context.Context) error {
 	// Достаем консьюмер из DI-контейнера
-	consumerService := app.diContainer.NotificationConsumer(ctx, app.config.KafkaBroker, app.config.GroupId, app.config.TelegramBotToken, app.config.TopicNames)
+	consumerService, err := app.diContainer.NotificationConsumer(ctx, app.config.KafkaBroker, app.config.GroupId, app.config.TelegramBotToken, app.config.TopicNames)
+	if err != nil {
+		return err
+	}
 
 	// Запускаем чтение сообщений из Kafka
 	go func() {

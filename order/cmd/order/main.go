@@ -70,6 +70,7 @@ func initConfig() (*app.Config, error) {
 		"DB_URI":                   &config.DbUri,
 		"MIGRATIONS_DIR":           &config.MigrationsDir,
 		"HTTP_PORT":                &config.HttpPort,
+		"HTTP_HOST":                &config.HttpHost,
 		"SERVER_INVENTORY_ADDRESS": &config.ServerInventoryAddress,
 		"SERVER_PAYMENT_ADDRESS":   &config.ServerPaymentAddress,
 		"ORDER_KAFKA_BROKER":       &config.KafkaBroker,

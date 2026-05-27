@@ -22,11 +22,11 @@ var _ OrderService = (*Service)(nil)
 
 type Service struct {
 	repo            db.OrderRepository
-	inventoryClient inventory.Client
+	inventoryClient *inventory.Client
 	producerService OrderProducerService
 }
 
-func NewService(orderRepository db.OrderRepository, inventoryClient inventory.Client, producerService OrderProducerService) *Service {
+func NewService(orderRepository db.OrderRepository, inventoryClient *inventory.Client, producerService OrderProducerService) *Service {
 	return &Service{repo: orderRepository, inventoryClient: inventoryClient, producerService: producerService}
 }
 

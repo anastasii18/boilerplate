@@ -18,6 +18,7 @@ type Config struct {
 	DbUri                  string
 	MigrationsDir          string
 	HttpPort               string
+	HttpHost               string
 	ServerInventoryAddress string
 	ServerPaymentAddress   string
 	KafkaBroker            string
@@ -72,8 +73,14 @@ func (app *App) initLogger(ctx context.Context) error {
 }
 
 func (app *App) initServer(ctx context.Context) error {
-	app.diContainer.NewOrderService(ctx, app.Config)
-	app.diContainer.NewServer(ctx, app.Config)
+	_, err := app.diContainer.NewOrderService(ctx, app.Config)
+	if err != nil {
+		return err
+	}
+	_, err = app.diContainer.NewServer(ctx, app.Config)
+	if err != nil {
+		return err
+	}
 	// Запускаем сервер в отдельной горутине
 	go func() {
 		logger.Info(ctx, fmt.Sprintf("🚀 HTTP-сервер запущен на порту %s\n", app.Config.HttpPort))
@@ -120,7 +127,12 @@ func (app *App) Run(ctx context.Context, config *Config) error {
 func (app *App) runConsumer(ctx context.Context, config *Config) error {
 	logger.Info(ctx, "🚀 Order Kafka consumer running")
 
-	err := app.diContainer.ConsumerService(config.ConsumeTopicName, config.KafkaBroker, config.ConsumerGroupId).RunConsumer(ctx)
+	consumerService, err := app.diContainer.ConsumerService(ctx, config)
+	if err != nil {
+		return err
+	}
+
+	err = consumerService.RunConsumer(ctx)
 	if err != nil {
 		return err
 	}

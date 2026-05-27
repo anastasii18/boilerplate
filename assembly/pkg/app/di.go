@@ -28,20 +28,35 @@ func NewDiContainer() *diContainer {
 	return &diContainer{}
 }
 
-func (d *diContainer) ProducerService(topicName, broker string) producer.ShipAssembledService {
+func (d *diContainer) ProducerService(topicName, broker string) (producer.ShipAssembledService, error) {
 	if d.producerService == nil {
-		d.producerService = producer.NewService(d.WrappedProducer(topicName, broker))
+		wrappedProducer, producerErr := d.WrappedProducer(topicName, broker)
+		if producerErr != nil {
+			return nil, producerErr
+		}
+
+		d.producerService = producer.NewService(wrappedProducer)
 	}
 
-	return d.producerService
+	return d.producerService, nil
 }
 
-func (d *diContainer) ConsumerService(produceTopic, consumeTopic, broker, groupId string) consumer.OrderPaidService {
+func (d *diContainer) ConsumerService(produceTopic, consumeTopic, broker, groupId string) (consumer.OrderPaidService, error) {
 	if d.consumerService == nil {
-		d.consumerService = consumer.NewService(d.WrappedConsumer(consumeTopic, broker, groupId), d.OrderPaidDecoder(), d.ProducerService(produceTopic, broker))
+		wrappedConsumer, consumerErr := d.WrappedConsumer(consumeTopic, broker, groupId)
+		if consumerErr != nil {
+			return nil, consumerErr
+		}
+
+		producerService, producerErr := d.ProducerService(produceTopic, broker)
+		if producerErr != nil {
+			return nil, producerErr
+		}
+
+		d.consumerService = consumer.NewService(wrappedConsumer, d.OrderPaidDecoder(), producerService)
 	}
 
-	return d.consumerService
+	return d.consumerService, nil
 }
 
 func (d *diContainer) OrderPaidDecoder() wrappedKafkaConsumer.OrderPaidDecoder {
@@ -52,47 +67,58 @@ func (d *diContainer) OrderPaidDecoder() wrappedKafkaConsumer.OrderPaidDecoder {
 	return d.orderPaidDecoder
 }
 
-func (d *diContainer) WrappedProducer(topicName, broker string) wrappedKafka.Producer {
+func (d *diContainer) WrappedProducer(topicName, broker string) (wrappedKafka.Producer, error) {
 	if d.producerService == nil {
+		syncProducer, producerErr := d.SyncProducer(broker)
+		if producerErr != nil {
+			return nil, producerErr
+		}
+
 		d.wrappedProducer = wrappedKafkaProducer.NewProducer(
-			d.SyncProducer(broker),
+			syncProducer,
 			topicName,
 			logger.Logger(),
 		)
 	}
 
-	return d.wrappedProducer
+	return d.wrappedProducer, nil
 }
 
-func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) wrappedKafka.Consumer {
+func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) (wrappedKafka.Consumer, error) {
 	if d.consumerService == nil {
+		consumerGroup, consumerErr := d.ConsumerGroup(broker, groupId)
+		if consumerErr != nil {
+			return nil, consumerErr
+		}
+
 		d.wrappedConsumer = wrappedKafkaConsumer.NewConsumer(
-			d.ConsumerGroup(broker, groupId),
+			consumerGroup,
 			[]string{topicName},
 			logger.Logger(),
 		)
 	}
 
-	return d.wrappedConsumer
+	return d.wrappedConsumer, nil
 }
 
-func (d *diContainer) SyncProducer(broker string) sarama.SyncProducer {
+func (d *diContainer) SyncProducer(broker string) (sarama.SyncProducer, error) {
 	if d.syncProducer == nil {
 		p, err := sarama.NewSyncProducer(
 			[]string{broker},
 			wrappedKafkaProducer.Config(),
 		)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create sync producer: %s\n", err.Error()))
+
+			return nil, fmt.Errorf("failed to create sync producer: %w", err)
 		}
 
 		d.syncProducer = p
 	}
 
-	return d.syncProducer
+	return d.syncProducer, nil
 }
 
-func (d *diContainer) ConsumerGroup(broker, groupId string) sarama.ConsumerGroup {
+func (d *diContainer) ConsumerGroup(broker, groupId string) (sarama.ConsumerGroup, error) {
 	if d.consumerGroup == nil {
 		consumerGroup, err := sarama.NewConsumerGroup(
 			[]string{broker},
@@ -100,11 +126,11 @@ func (d *diContainer) ConsumerGroup(broker, groupId string) sarama.ConsumerGroup
 			wrappedKafkaConsumer.Config(),
 		)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create consumer group: %s\n", err.Error()))
+			return nil, fmt.Errorf("failed to create consumer group: %w", err)
 		}
 
 		d.consumerGroup = consumerGroup
 	}
 
-	return d.consumerGroup
+	return d.consumerGroup, nil
 }

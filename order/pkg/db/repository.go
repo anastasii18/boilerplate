@@ -80,7 +80,7 @@ func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
-		log.Fatalf("failed to build query: %v\n", err)
+		return fmt.Errorf("build query: %w", err)
 		return err
 	}
 
