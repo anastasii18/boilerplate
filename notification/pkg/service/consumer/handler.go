@@ -12,7 +12,7 @@ import (
 var (
 	ShipAssembledTopic       = "ship.assembled"
 	OrderPaidTopic           = "order.paid"
-	ChatID             int64 = 946332317 //поменять на действительный
+	ChatID             int64 = 1 //поменять на действительный
 )
 
 func (s *service) OrderHandler(ctx context.Context, msg kafka.Message) error {

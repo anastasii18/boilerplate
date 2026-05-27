@@ -26,8 +26,9 @@ func main() {
 	ctx := context.Background()
 	config, err := initConfig()
 	if err != nil {
-		log.Printf("failed to init config: %v\n", err)
+		log.Fatal("failed to init config: %w", err)
 	}
+
 	config.ReadHeaderTimeout = readHeaderTimeout
 	config.ShutdownTimeout = shutdownTimeout
 	database, err := db.NewDB(ctx, config.DbUri)

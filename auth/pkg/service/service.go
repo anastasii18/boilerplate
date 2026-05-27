@@ -45,6 +45,10 @@ func (s *Service) Login(ctx context.Context, user User) (*string, error) {
 	}
 
 	userFull, err := s.repo.GetUserByLogin(ctx, user.Login)
+	if err != nil {
+		return nil, err
+	}
+
 	err = s.cacheRepo.Set(ctx, Val(sessionUuid), UserToRedisView(NewUser(userFull)), s.cacheTTL)
 	if err != nil {
 		return nil, err
