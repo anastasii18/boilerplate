@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"order/pkg/client/payment"
 	"order/pkg/service"
-	logger "platform/pkg"
+	"platform/pkg/logger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -101,7 +101,7 @@ func (a *Api) PayOrderHandler(ctx context.Context, paymentClient payment.Client)
 			return
 		}
 
-		err = a.orderService.UpdateOrder(ctx, orderId, Ptr(payOrderResponse.GetTransactionUuid()), Ptr(service.PAID), Ptr(service.OrderPaymentMethod(payBody.PaymentMethod)))
+		err = a.orderService.UpdateOrder(ctx, orderId, Ptr(payOrderResponse.GetTransactionUuid()), Ptr(service.PAID), Ptr(payBody.PaymentMethod))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -127,6 +127,11 @@ func (a *Api) CancelOrderHandler(ctx context.Context) http.HandlerFunc {
 		orderData, err := a.orderService.GetOrder(ctx, orderId)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Order with ID '%s' not found.", orderId), http.StatusNotFound)
+			return
+		}
+
+		if orderData.Status == service.COMPLETED {
+			http.Error(w, fmt.Sprintf("Order with ID '%s' has already been completed and cannot be cancelled.", orderId), http.StatusConflict)
 			return
 		}
 

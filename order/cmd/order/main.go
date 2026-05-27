@@ -8,11 +8,12 @@ import (
 	"order/pkg/db"
 	"os"
 	"os/signal"
-	logger "platform/pkg"
+	"platform/pkg/logger"
 	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
 const (
@@ -35,7 +36,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a, err := app.New(ctx, config)
+
+	var a *app.App
+	a, err = app.New(ctx, config)
+	if err != nil {
+		logger.Error(ctx, "❌ Ошибка при создании приложения", zap.Error(err))
+		return
+	}
+
+	err = a.Run(ctx, config)
+	if err != nil {
+		logger.Error(ctx, "❌ Ошибка при работе приложения", zap.Error(err))
+		return
+	}
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
@@ -50,7 +63,7 @@ func main() {
 func initConfig() (*app.Config, error) {
 	var config app.Config
 	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("failed to load .env: %v", err)
+		return nil, fmt.Errorf("failed to load .env: %w", err)
 	}
 
 	secretsMapping := map[string]*string{
@@ -59,6 +72,10 @@ func initConfig() (*app.Config, error) {
 		"HTTP_PORT":                &config.HttpPort,
 		"SERVER_INVENTORY_ADDRESS": &config.ServerInventoryAddress,
 		"SERVER_PAYMENT_ADDRESS":   &config.ServerPaymentAddress,
+		"ORDER_KAFKA_BROKER":       &config.KafkaBroker,
+		"CONSUME_TOPIC_NAME":       &config.ConsumeTopicName,
+		"PRODUCE_TOPIC_NAME":       &config.ProduceTopicName,
+		"ORDER_CONSUMER_GROUP_ID":  &config.ConsumerGroupId,
 	}
 	for key, target := range secretsMapping {
 		*target = os.Getenv(key)

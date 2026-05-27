@@ -10,8 +10,7 @@ import (
 )
 
 func NewPart(part *service.Part) *inventoryV1.Part {
-	var category inventoryV1.Category
-	category = inventoryV1.Category(part.Category)
+	category := inventoryV1.Category(part.Category)
 
 	var dimensions *inventoryV1.Dimensions
 	if part.Dimensions != nil {
@@ -87,8 +86,7 @@ func NewPart(part *service.Part) *inventoryV1.Part {
 }
 
 func NewServicePart(part *inventoryV1.Part) *service.Part {
-	var category service.Category
-	category = service.Category(part.Category.Number())
+	category := service.Category(part.Category.Number())
 
 	var dimensions *service.Dimensions
 	if part.Dimensions != nil {

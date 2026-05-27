@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"payment/pkg/repository"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestPayOrder(t *testing.T) {
 			service := &Service{
 				paymentRepository: repository.NewRepository(),
 			}
-			got := service.PayOrder(nil)
+			got := service.PayOrder(context.Background())
 			require.NoError(t, uuid.Validate(got))
 		})
 	}

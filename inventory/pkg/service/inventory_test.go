@@ -1,23 +1,44 @@
 package service
 
 import (
+	"context"
 	"inventory/pkg/db"
+	"os"
 	"reflect"
 	"testing"
 )
 
-var s = Service{
-	repo: db.NewRepository().Seed(),
+var (
+	s Service
+
+	oneId   = "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
+	twoId   = "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
+	threeId = "29a9ab94-c814-4828-9a02-b96598dbe299"
+
+	one   *Part
+	two   *Part
+	three *Part
+)
+
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+	database, _ := db.NewDB(ctx, "mongodb://user:pswrd@localhost:27017/inventory?authSource=admin", "test")
+	s = Service{
+		repo: db.NewRepository(database).Seed(ctx),
+	}
+
+	onet, _ := s.repo.GetPart(ctx, oneId)
+	twot, _ := s.repo.GetPart(ctx, twoId)
+	threet, _ := s.repo.GetPart(ctx, threeId)
+
+	one = NewPart(onet)
+	two = NewPart(twot)
+	three = NewPart(threet)
+
+	// Запуск тестов
+	code := m.Run()
+	os.Exit(code)
 }
-var oneId = "fbb05498-4db6-48c8-b945-3e56f4e5ad04"
-var onet, _ = s.repo.GetPart(oneId)
-var one = NewPart(onet)
-var twoId = "bf802b57-1c7d-41ff-9cb7-ee43dbadbf98"
-var twot, _ = s.repo.GetPart(twoId)
-var two = NewPart(twot)
-var threeId = "29a9ab94-c814-4828-9a02-b96598dbe299"
-var threet, _ = s.repo.GetPart(threeId)
-var three = NewPart(threet)
 
 func TestGetPart(t *testing.T) {
 	type args struct {
@@ -42,10 +63,12 @@ func TestGetPart(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			got, err := s.GetPart(tt.args.id)
+			got, err := s.GetPart(ctx, tt.args.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetPart() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -104,10 +127,12 @@ func TestGetParts(t *testing.T) {
 			},
 		},
 	}
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			if got := s.GetParts(tt.args.filter); !reflect.DeepEqual(got, tt.want) {
+			if got, _ := s.GetParts(ctx, tt.args.filter); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetParts() = %v, want %v", got, tt.want)
 			}
 		})

@@ -21,14 +21,18 @@ var _ OrderService = (*Service)(nil)
 type Service struct {
 	repo            db.OrderRepository
 	inventoryClient inventory.Client
+	producerService OrderProducerService
 }
 
-func NewService(orderRepository db.OrderRepository, inventoryClient inventory.Client) *Service {
-	return &Service{repo: orderRepository, inventoryClient: inventoryClient}
+func NewService(orderRepository db.OrderRepository, inventoryClient inventory.Client, producerService OrderProducerService) *Service {
+	return &Service{repo: orderRepository, inventoryClient: inventoryClient, producerService: producerService}
 }
 
 func (s Service) CreateOrder(ctx context.Context, order *Order) error {
-	parts, _ := s.inventoryClient.GetInventoryPartsForIDs(ctx, order.PartUuids)
+	parts, err := s.inventoryClient.GetInventoryPartsForIDs(ctx, order.PartUuids)
+	if err != nil {
+		return err
+	}
 
 	// Проверяет, что все детали существуют. Если хотя бы одной нет — возвращает ошибку
 	if len(order.PartUuids) != len(parts) {
@@ -50,7 +54,7 @@ func (s Service) CreateOrder(ctx context.Context, order *Order) error {
 	order.OrderUuid = uuid.New().String()
 	order.Status = PENDING_PAYMENT
 
-	err := s.repo.CreateOrder(ctx, OrderToRepoModel(order))
+	err = s.repo.CreateOrder(ctx, OrderToRepoModel(order))
 	if err != nil {
 		return err
 	}
@@ -67,5 +71,28 @@ func (s Service) GetOrder(ctx context.Context, orderUuid string) (*Order, error)
 }
 
 func (s Service) UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
-	return s.repo.UpdateOrder(ctx, orderUuid, transactionUuid, StatusToRepoStatus(status), PaymentMethodToRepoPaymentMethod(paymentMethod))
+	err := s.repo.UpdateOrder(ctx, orderUuid, transactionUuid, StatusToRepoStatus(status), PaymentMethodToRepoPaymentMethod(paymentMethod))
+	if err != nil {
+		return err
+	}
+
+	if Val(status) == PAID {
+		userUuid, err := s.repo.GetUserUuidForOrder(ctx, orderUuid)
+		if err != nil {
+			return err
+		}
+
+		err = s.producerService.ProduceOrderPaid(ctx, OrderPaid{
+			EventUuid:       uuid.New().String(),
+			OrderUuid:       orderUuid,
+			UserUuid:        Val(userUuid),
+			TransactionUuid: transactionUuid,
+			PaymentMethod:   paymentMethod.String(),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return err
 }

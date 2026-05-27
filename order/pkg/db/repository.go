@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"order/pkg/migrator"
-	logger "platform/pkg"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -19,6 +18,7 @@ type OrderRepository interface {
 	CreateOrder(ctx context.Context, order *Order) error
 	GetOrder(ctx context.Context, orderUuid string) (*Order, error)
 	UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error
+	GetUserUuidForOrder(ctx context.Context, orderUuid string) (*string, error)
 }
 
 type Repository struct {
@@ -33,7 +33,7 @@ func NewDB(ctx context.Context, dbURI string) (*DB, error) {
 	// Создаем пул соединений с базой данных
 	pool, err := pgxpool.New(ctx, dbURI)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v\n", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	err = pool.Ping(ctx)
@@ -56,7 +56,7 @@ func Migrate(ctx context.Context, db *DB, migrationsDir string) {
 
 	err := migratorRunner.Up()
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("Ошибка миграции базы данных: %v\n", err))
+		log.Fatalf("Ошибка миграции базы данных: %v\n", err)
 		return
 	}
 }
@@ -80,18 +80,18 @@ func (r *Repository) CreateOrder(ctx context.Context, order *Order) error {
 
 	query, args, err := builderInsert.ToSql()
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to build query: %v\n", err))
+		log.Fatalf("failed to build query: %v\n", err)
 		return err
 	}
 
 	var orderId string
 	err = r.db.QueryRow(ctx, query, args...).Scan(&orderId)
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to insert order: %v\n", err))
+		log.Fatalf("failed to insert order: %v\n", err)
 		return err
 	}
 
-	logger.Info(ctx, fmt.Sprintf("inserted order with id: %s\n", orderId))
+	log.Printf("inserted order with id: %s\n", orderId)
 
 	return nil
 }
@@ -125,6 +125,37 @@ func (r *Repository) GetOrder(ctx context.Context, orderUuid string) (*Order, er
 	return &order, nil
 }
 
+func (r *Repository) GetUserUuidForOrder(ctx context.Context, orderUuid string) (*string, error) {
+	builderSelect := sq.Select("user_uuid").
+		From("\"order\"").
+		PlaceholderFormat(sq.Dollar).
+		Where(sq.Eq{"order_uuid": orderUuid}).
+		Limit(1)
+
+	query, args, err := builderSelect.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	row, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	defer row.Close()
+
+	var userUUID *string
+
+	err = r.db.QueryRow(ctx, query, args...).Scan(&userUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("user not found for order: %s", orderUuid)
+		}
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	return userUUID, nil
+}
+
 func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transactionUuid *string, status *OrderStatus, paymentMethod *OrderPaymentMethod) error {
 	_, ok := r.GetOrder(ctx, orderUuid)
 
@@ -151,17 +182,15 @@ func (r *Repository) UpdateOrder(ctx context.Context, orderUuid string, transact
 
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to build query: %v\n", err))
-		return fmt.Errorf("failed to build query: %v\n", err)
+		return fmt.Errorf("failed to build query: %w", err)
 	}
 
 	res, err := r.db.Exec(ctx, query, args...)
 	if err != nil {
-		logger.Error(ctx, fmt.Sprintf("failed to update order: %v\n", err))
-		return fmt.Errorf("failed to update order: %v\n", err)
+		return fmt.Errorf("failed to update order: %w", err)
 	}
 
-	logger.Info(ctx, fmt.Sprintf("updated %d rows", res.RowsAffected()))
+	log.Printf("updated %d rows", res.RowsAffected())
 
 	return nil
 }

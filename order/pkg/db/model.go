@@ -25,11 +25,13 @@ const (
 	PENDING_PAYMENT OrderStatus = 0
 	PAID            OrderStatus = 1
 	CANCELLED       OrderStatus = 2
+	COMPLETED       OrderStatus = 3
 )
 
 var STATUS_PENDING_PAYMENT = "PENDING_PAYMENT"
 var STATUS_PAID = "PAID"
 var STATUS_CANCELLED = "CANCELLED"
+var STATUS_COMPLETED = "COMPLETED"
 
 type OrderPaymentMethod int32
 
@@ -89,6 +91,8 @@ func (m *OrderStatus) Scan(value interface{}) error {
 		*m = PAID
 	case STATUS_CANCELLED:
 		*m = CANCELLED
+	case STATUS_COMPLETED:
+		*m = COMPLETED
 	default:
 		return fmt.Errorf("unknown status: %q", str)
 	}
@@ -130,6 +134,8 @@ func (s OrderStatus) String() string {
 		return STATUS_PAID
 	case CANCELLED:
 		return STATUS_CANCELLED
+	case COMPLETED:
+		return STATUS_COMPLETED
 	default:
 		return STATUS_PENDING_PAYMENT
 	}

@@ -119,10 +119,19 @@ func TestMain(m *testing.M) {
 
 	// Cleanup
 	testCleanup = func() {
-		testClientConn.Close()
+		err = testClientConn.Close()
+		if err != nil {
+			log.Fatalf("failed to close client conn: %v", err)
+		}
 		testGRPCServer.GracefulStop()
-		client.Disconnect(testCtx)
-		testcontainers.TerminateContainer(testMongoC)
+
+		if err := client.Disconnect(testCtx); err != nil {
+			log.Printf("warning: failed to disconnect mongo client: %v", err)
+		}
+
+		if err := testcontainers.TerminateContainer(testMongoC); err != nil {
+			log.Printf("warning: failed to terminate mongodb container: %v", err)
+		}
 	}
 
 	// подготовка данных
