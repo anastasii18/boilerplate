@@ -88,7 +88,7 @@ func (a *App) Run(ctx context.Context) error {
 	logger.Info(ctx, "Initiating graceful shutdown...")
 	consumerCancel()
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 15*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer shutdownCancel()
 
 	select {
