@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -41,12 +42,12 @@ func (s Service) CreateOrder(ctx context.Context, order *Order) error {
 	if len(order.PartUuids) != len(parts) {
 		return fmt.Errorf("one of part not found")
 	}
-	totalPrice := 0.0
+	totalPrice := decimal.NewFromInt(0)
 	for _, part := range parts {
 		if part.StockQuantity < 1 {
 			return fmt.Errorf("one of part stock quantity not found")
 		}
-		totalPrice += part.Price
+		totalPrice = totalPrice.Add(decimal.NewFromFloat(part.Price))
 	}
 	if order.PartUuids == nil {
 		order.PartUuids = []string{}

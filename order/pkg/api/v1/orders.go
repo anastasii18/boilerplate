@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"github.com/shopspring/decimal"
 )
 
 const urlParam = "order_uuid"
@@ -42,14 +43,15 @@ func (a *Api) CreateOrderHandler() http.HandlerFunc {
 		}
 
 		type resultCreate struct {
-			TotalPrice float64 `json:"total_price"`
-			OrderUuid  string  `json:"order_uuid"`
+			TotalPrice decimal.Decimal `json:"total_price"`
+			OrderUuid  string          `json:"order_uuid"`
 		}
 
 		var result resultCreate
 		result.OrderUuid = orderCreate.OrderUuid
 		result.TotalPrice = orderCreate.TotalPrice
 
+		render.Status(r, http.StatusCreated)
 		render.JSON(w, r, result)
 	}
 }

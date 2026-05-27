@@ -41,13 +41,13 @@ func main() {
 	var a *app.App
 	a, err = app.New(ctx, config)
 	if err != nil {
-		logger.Error(ctx, "❌ Ошибка при создании приложения", zap.Error(err))
+		logger.Error(ctx, "Ошибка при создании приложения", zap.Error(err))
 		return
 	}
 
 	err = a.Run(ctx, config)
 	if err != nil {
-		logger.Error(ctx, "❌ Ошибка при работе приложения", zap.Error(err))
+		logger.Error(ctx, "Ошибка при работе приложения", zap.Error(err))
 		return
 	}
 

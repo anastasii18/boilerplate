@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type Order struct {
 	OrderUuid       string             `json:"order_uuid"`
 	UserUuid        string             `json:"user_uuid"`
 	PartUuids       []string           `json:"part_uuids"`
-	TotalPrice      float64            `json:"total_price"`
+	TotalPrice      decimal.Decimal    `json:"total_price"`
 	TransactionUuid *string            `json:"transaction_uuid"`
 	PaymentMethod   OrderPaymentMethod `json:"payment_method"`
 	Status          OrderStatus        `json:"status"`
