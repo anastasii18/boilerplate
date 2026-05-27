@@ -10,9 +10,11 @@ import (
 	"context"
 	"github.com/google/wire"
 	grpc2 "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"inventory/pkg/db"
 	"inventory/pkg/grpc"
 	"inventory/pkg/service"
+	"shared/pkg/proto/auth/v1"
 	"shared/pkg/proto/inventory/v1"
 )
 
@@ -27,8 +29,13 @@ func InitializeContainer(ctx context.Context, cfg *Config, initIndexes bool) (*C
 	repository := db.NewRepository(dbDB)
 	serviceService := service.NewService(repository)
 	api := grpc.New(serviceService)
-	v := ProvideGRPCServerOptions()
-	server := grpc2.NewServer(v...)
+	authServiceClient, cleanup, err := ProvideAuthClient(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	authInterceptor := ProvideAuthInterceptor(authServiceClient)
+	v := ProvideGRPCServerOptions(authInterceptor)
+	server := ProvideServer(v)
 	container := &Container{
 		inventoryApi:     api,
 		inventoryService: serviceService,
@@ -37,6 +44,7 @@ func InitializeContainer(ctx context.Context, cfg *Config, initIndexes bool) (*C
 		DB:               dbDB,
 	}
 	return container, func() {
+		cleanup()
 	}, nil
 }
 
@@ -50,8 +58,8 @@ type Container struct {
 	DB               *db.DB
 }
 
-func ProvideGRPCServerOptions() []grpc2.ServerOption {
-	return []grpc2.ServerOption{}
+func ProvideGRPCServerOptions(interceptor *grpc.AuthInterceptor) []grpc2.ServerOption {
+	return []grpc2.ServerOption{grpc2.UnaryInterceptor(interceptor.Unary())}
 }
 
 func ProvideMongoDB(ctx context.Context, cfg *Config) (*db.DB, error) {
@@ -62,6 +70,27 @@ func InitializeDBIndexes(ctx context.Context, db2 *db.DB, initIndexes bool) erro
 	return db2.InitIndex(ctx, initIndexes)
 }
 
+func ProvideAuthClient(ctx context.Context, cfg *Config) (auth_v1.AuthServiceClient, func(), error) {
+	conn, err := grpc2.NewClient(
+		cfg.ServerAuthAddress, grpc2.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := auth_v1.NewAuthServiceClient(conn)
+
+	cleanup := func() {
+		_ = conn.Close()
+	}
+
+	return client, cleanup, nil
+}
+
+func ProvideAuthInterceptor(authClient auth_v1.AuthServiceClient) *grpc.AuthInterceptor {
+	return grpc.NewAuthInterceptor(authClient)
+}
+
 var DatabaseSet = wire.NewSet(
 	ProvideMongoDB, db.NewRepository, wire.Bind(new(db.InventoryRepository), new(*db.Repository)), InitializeDBIndexes,
 )
@@ -69,11 +98,18 @@ var DatabaseSet = wire.NewSet(
 var ServiceSet = wire.NewSet(service.NewService, wire.Bind(new(service.InventoryService), new(*service.Service)))
 
 var GRPCServerSet = wire.NewSet(
-	ProvideGRPCServerOptions, grpc2.NewServer,
+	ProvideAuthClient,
+	ProvideAuthInterceptor,
+	ProvideGRPCServerOptions,
+	ProvideServer,
 )
 
 var APISet = wire.NewSet(grpc.New)
 
 func (c *Container) RegisterGRPCServices() {
 	inventory_v1.RegisterInventoryServiceServer(c.Server, c.inventoryApi)
+}
+
+func ProvideServer(opts []grpc2.ServerOption) *grpc2.Server {
+	return grpc2.NewServer(opts...)
 }

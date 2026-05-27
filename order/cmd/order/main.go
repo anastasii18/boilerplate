@@ -26,8 +26,9 @@ func main() {
 	ctx := context.Background()
 	config, err := initConfig()
 	if err != nil {
-		log.Printf("failed to init config: %v\n", err)
+		log.Fatal("failed to init config: %w", err)
 	}
+
 	config.ReadHeaderTimeout = readHeaderTimeout
 	config.ShutdownTimeout = shutdownTimeout
 	database, err := db.NewDB(ctx, config.DbUri)
@@ -40,13 +41,13 @@ func main() {
 	var a *app.App
 	a, err = app.New(ctx, config)
 	if err != nil {
-		logger.Error(ctx, "❌ Ошибка при создании приложения", zap.Error(err))
+		logger.Error(ctx, "Ошибка при создании приложения", zap.Error(err))
 		return
 	}
 
 	err = a.Run(ctx, config)
 	if err != nil {
-		logger.Error(ctx, "❌ Ошибка при работе приложения", zap.Error(err))
+		logger.Error(ctx, "Ошибка при работе приложения", zap.Error(err))
 		return
 	}
 
@@ -70,6 +71,7 @@ func initConfig() (*app.Config, error) {
 		"DB_URI":                   &config.DbUri,
 		"MIGRATIONS_DIR":           &config.MigrationsDir,
 		"HTTP_PORT":                &config.HttpPort,
+		"HTTP_HOST":                &config.HttpHost,
 		"SERVER_INVENTORY_ADDRESS": &config.ServerInventoryAddress,
 		"SERVER_PAYMENT_ADDRESS":   &config.ServerPaymentAddress,
 		"ORDER_KAFKA_BROKER":       &config.KafkaBroker,

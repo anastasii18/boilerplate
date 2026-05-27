@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"inventory/pkg/service"
 	inventoryV1 "shared/pkg/proto/inventory/v1"
 )
@@ -36,9 +37,10 @@ func (a *Api) GetPart(ctx context.Context, req *inventoryV1.GetPartRequest) (*in
 func (a *Api) GetListParts(ctx context.Context, req *inventoryV1.GetListPartsRequest) (*inventoryV1.GetListPartsResponse, error) {
 	parts, err := a.inventoryService.GetParts(ctx, NewPartSearch(req.GetFilter()))
 	if err != nil {
-		return nil, errors.New("can't get parts")
+		return nil, fmt.Errorf("failed to get parts from service: %w", err)
 	}
-	var result []*inventoryV1.Part
+
+	result := make([]*inventoryV1.Part, 0, len(parts))
 	for _, part := range parts {
 		result = append(result, NewPart(part))
 	}

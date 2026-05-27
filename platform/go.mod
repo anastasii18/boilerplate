@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/IBM/sarama v1.47.0
+	github.com/gomodule/redigo v1.9.3
 	github.com/pkg/errors v0.9.1
 	go.uber.org/zap v1.27.1
 )

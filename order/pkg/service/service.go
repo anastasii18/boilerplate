@@ -3,11 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"order/pkg"
 	"order/pkg/client/inventory"
 	"order/pkg/db"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+	"google.golang.org/grpc/metadata"
 )
 
 type OrderService interface {
@@ -20,15 +23,16 @@ var _ OrderService = (*Service)(nil)
 
 type Service struct {
 	repo            db.OrderRepository
-	inventoryClient inventory.Client
+	inventoryClient *inventory.Client
 	producerService OrderProducerService
 }
 
-func NewService(orderRepository db.OrderRepository, inventoryClient inventory.Client, producerService OrderProducerService) *Service {
+func NewService(orderRepository db.OrderRepository, inventoryClient *inventory.Client, producerService OrderProducerService) *Service {
 	return &Service{repo: orderRepository, inventoryClient: inventoryClient, producerService: producerService}
 }
 
 func (s Service) CreateOrder(ctx context.Context, order *Order) error {
+	ctx = addSessionUuid(ctx)
 	parts, err := s.inventoryClient.GetInventoryPartsForIDs(ctx, order.PartUuids)
 	if err != nil {
 		return err
@@ -38,12 +42,12 @@ func (s Service) CreateOrder(ctx context.Context, order *Order) error {
 	if len(order.PartUuids) != len(parts) {
 		return fmt.Errorf("one of part not found")
 	}
-	totalPrice := 0.0
+	totalPrice := decimal.NewFromInt(0)
 	for _, part := range parts {
 		if part.StockQuantity < 1 {
 			return fmt.Errorf("one of part stock quantity not found")
 		}
-		totalPrice += part.Price
+		totalPrice = totalPrice.Add(decimal.NewFromFloat(part.Price))
 	}
 	if order.PartUuids == nil {
 		order.PartUuids = []string{}
@@ -95,4 +99,14 @@ func (s Service) UpdateOrder(ctx context.Context, orderUuid string, transactionU
 	}
 
 	return err
+}
+
+func addSessionUuid(ctx context.Context) context.Context {
+	val := ctx.Value(pkg.SessionUUIDKey)
+
+	if str, ok := val.(string); ok && str != "" {
+		return metadata.AppendToOutgoingContext(ctx, "session-uuid", str)
+	}
+
+	return ctx
 }

@@ -15,16 +15,16 @@ type Client struct {
 	serviceClient inventoryV1.InventoryServiceClient
 }
 
-func NewClient(serverInventoryAddress string) (Client, error) {
+func NewClient(serverInventoryAddress string) (*Client, error) {
 	conn, err := grpc.NewClient(
 		serverInventoryAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return Client{}, fmt.Errorf("failed to connect: %w", err)
+		return &Client{}, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	return Client{inventoryV1.NewInventoryServiceClient(conn)}, nil
+	return &Client{inventoryV1.NewInventoryServiceClient(conn)}, nil
 }
 
 func (c *Client) GetListParts(ctx context.Context, uuids []string) (*inventoryV1.GetListPartsResponse, error) {

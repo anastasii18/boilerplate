@@ -32,48 +32,60 @@ func NewDiContainer() *diContainer {
 	return &diContainer{}
 }
 
-func (d *diContainer) TelegramService(ctx context.Context, token string) *service.TGService {
+func (d *diContainer) TelegramService(ctx context.Context, token string) (*service.TGService, error) {
 	if d.telegramService == nil {
-		d.telegramService = service.NewService(
-			d.TelegramClient(ctx, token),
-		)
+		telegramClient, err := d.TelegramClient(ctx, token)
+		if err != nil {
+			return nil, err
+		}
+
+		d.telegramService = service.NewService(telegramClient)
 	}
 
-	return d.telegramService
+	return d.telegramService, nil
 }
 
-func (d *diContainer) TelegramClient(ctx context.Context, token string) telegram.TelegramClient {
+func (d *diContainer) TelegramClient(ctx context.Context, token string) (telegram.TelegramClient, error) {
 	if d.telegramClient == nil {
-		d.telegramClient = telegram.NewClient(d.TelegramBot(ctx, token))
+		telegramBot, err := d.TelegramBot(ctx, token)
+		if err != nil {
+			return nil, err
+		}
+		d.telegramClient = telegram.NewClient(telegramBot)
 	}
 
-	return d.telegramClient
+	return d.telegramClient, nil
 }
 
-func (d *diContainer) TelegramBot(ctx context.Context, token string) *bot.Bot {
+func (d *diContainer) TelegramBot(ctx context.Context, token string) (*bot.Bot, error) {
 	if d.telegramBot == nil {
 		b, err := bot.New(token)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create telegram bot: %s\n", err.Error()))
+			return nil, fmt.Errorf("failed to create telegram bot: %w", err)
 		}
 
 		d.telegramBot = b
 	}
 
-	return d.telegramBot
+	return d.telegramBot, nil
 }
 
-func (d *diContainer) NotificationConsumer(ctx context.Context, broker, groupId, token string, topicName []string) consumer.ShipAndOrderNotificationService {
+func (d *diContainer) NotificationConsumer(ctx context.Context, broker, groupId, token string, topicName []string) (consumer.ShipAndOrderNotificationService, error) {
 	if d.consumer == nil {
+		telegramService, err := d.TelegramService(ctx, token)
+		if err != nil {
+			return nil, err
+		}
+
 		d.consumer = consumer.NewService(
 			d.WrappedConsumer(topicName, broker, groupId),
 			d.ShipAssembledDecoder(),
 			d.OrderPaidDecoder(),
-			d.TelegramService(ctx, token),
+			telegramService,
 		)
 	}
 
-	return d.consumer
+	return d.consumer, nil
 }
 
 func (d *diContainer) WrappedConsumer(topicName []string, broker, groupId string) wrappedKafka.Consumer {

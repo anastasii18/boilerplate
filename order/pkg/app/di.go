@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"order/pkg"
 	api "order/pkg/api/v1"
 	"order/pkg/client/inventory"
 	"order/pkg/client/payment"
@@ -27,8 +28,8 @@ type diContainer struct {
 	Repo            *db.Repository
 	Server          *http.Server
 	OrderService    service.OrderService
-	InventoryClient inventory.Client
-	PaymentClient   payment.Client
+	InventoryClient *inventory.Client
+	PaymentClient   *payment.Client
 
 	consumerService consumer.ShipAssembledService
 	producerService service.OrderProducerService
@@ -45,88 +46,135 @@ func NewDiContainer() *diContainer {
 	return &diContainer{}
 }
 
-func (d *diContainer) NewRepo(ctx context.Context, config *Config) *db.Repository {
-	database, err := db.NewDB(ctx, config.DbUri)
-	if err != nil {
-		panic(err)
+func (d *diContainer) NewRepo(ctx context.Context, config *Config) (*db.Repository, error) {
+	if d.Repo == nil {
+		database, err := db.NewDB(ctx, config.DbUri)
+		if err != nil {
+			return nil, err
+		}
+		d.Repo = db.NewRepository(database)
 	}
-	d.Repo = db.NewRepository(database)
 
-	return d.Repo
+	return d.Repo, nil
 }
 
-func (d *diContainer) NewServer(ctx context.Context, config *Config) *http.Server {
+func (d *diContainer) NewServer(ctx context.Context, config *Config) (*http.Server, error) {
 	// Инициализируем роутер Chi
 	r := chi.NewRouter()
 
 	// Добавляем middleware
+	r.Use(pkg.AuthMiddleWare)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
 	r.Use(render.SetContentType(render.ContentTypeJSON))
+	orderService, err := d.NewOrderService(ctx, config)
+	if err != nil {
+		return nil, err
+	}
 
-	a := api.New(d.OrderService)
+	a := api.New(orderService)
+	paymentService, err := d.NewPaymentClient(config)
+	if err != nil {
+		return nil, err
+	}
 	// Определяем маршруты
 	r.Route("/api/v1/orders", func(r chi.Router) {
 		// Получить заказ по UUID
-		r.Get("/{order_uuid}", a.GetOrderHandler(ctx))
+		r.Get("/{order_uuid}", a.GetOrderHandler())
 		// Создание заказа
-		r.Post("/", a.CreateOrderHandler(ctx))
+		r.Post("/", a.CreateOrderHandler())
 		// Оплата заказа
-		r.Post("/{order_uuid}/pay", a.PayOrderHandler(ctx, d.NewPaymentClient(ctx, config)))
+		r.Post("/{order_uuid}/pay", a.PayOrderHandler(paymentService))
 		// Отменить заказ
-		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler(ctx))
+		r.Post("/{order_uuid}/cancel", a.CancelOrderHandler())
 	})
 
 	d.Server = &http.Server{
-		Addr:              net.JoinHostPort("localhost", config.HttpPort),
+		Addr:              net.JoinHostPort(config.HttpHost, config.HttpPort),
 		Handler:           r,
 		ReadHeaderTimeout: config.ReadHeaderTimeout, // Защита от Slowloris атак - тип DDoS-атаки, при которой
 		// атакующий умышленно медленно отправляет HTTP-заголовки, удерживая соединения открытыми и истощая
 		// пул доступных соединений на сервере. ReadHeaderTimeout принудительно закрывает соединение,
 		// если клиент не успел отправить все заголовки за отведенное время.
 	}
-	return d.Server
+	return d.Server, nil
 }
 
-func (d *diContainer) NewOrderService(ctx context.Context, config *Config) service.OrderService {
-	d.OrderService = service.NewService(d.NewRepo(ctx, config), d.NewInventoryClient(ctx, config), d.ProducerService(config.ProduceTopicName, config.KafkaBroker))
-	return d.OrderService
-}
+func (d *diContainer) NewOrderService(ctx context.Context, config *Config) (service.OrderService, error) {
+	if d.OrderService == nil {
+		repo, errRepo := d.NewRepo(ctx, config)
+		if errRepo != nil {
+			return nil, errRepo
+		}
 
-func (d *diContainer) NewInventoryClient(ctx context.Context, config *Config) inventory.Client {
-	inventoryClient, err := inventory.NewClient(config.ServerInventoryAddress)
-	if err != nil {
-		panic(err)
+		inventoryService, errInventory := d.NewInventoryClient(config)
+		if errInventory != nil {
+			return nil, errInventory
+		}
+
+		producerService, producerErr := d.ProducerService(config.ProduceTopicName, config.KafkaBroker)
+		if producerErr != nil {
+			return nil, producerErr
+		}
+
+		d.OrderService = service.NewService(repo, inventoryService, producerService)
 	}
-	d.InventoryClient = inventoryClient
 
-	return d.InventoryClient
+	return d.OrderService, nil
 }
 
-func (d *diContainer) NewPaymentClient(ctx context.Context, config *Config) payment.Client {
-	paymentClient, err := payment.NewClient(config.ServerPaymentAddress)
-	if err != nil {
-		panic(err)
+func (d *diContainer) NewInventoryClient(config *Config) (*inventory.Client, error) {
+	if d.InventoryClient == nil {
+		inventoryClient, err := inventory.NewClient(config.ServerInventoryAddress)
+		if err != nil {
+			return nil, err
+		}
+		d.InventoryClient = inventoryClient
 	}
-	d.PaymentClient = paymentClient
 
-	return d.PaymentClient
+	return d.InventoryClient, nil
 }
 
-func (d *diContainer) ProducerService(topicName, broker string) service.OrderProducerService {
+func (d *diContainer) NewPaymentClient(config *Config) (*payment.Client, error) {
+	if d.PaymentClient == nil {
+		paymentClient, err := payment.NewClient(config.ServerPaymentAddress)
+		if err != nil {
+			return nil, err
+		}
+		d.PaymentClient = paymentClient
+	}
+
+	return d.PaymentClient, nil
+}
+
+func (d *diContainer) ProducerService(topicName, broker string) (service.OrderProducerService, error) {
 	if d.producerService == nil {
-		d.producerService = service.NewProducerService(d.WrappedProducer(topicName, broker))
+		wrappedProducer, err := d.WrappedProducer(topicName, broker)
+		if err != nil {
+			return nil, err
+		}
+		d.producerService = service.NewProducerService(wrappedProducer)
 	}
-	return d.producerService
+	return d.producerService, nil
 }
 
-func (d *diContainer) ConsumerService(topicName, broker, groupId string) consumer.ShipAssembledService {
+func (d *diContainer) ConsumerService(ctx context.Context, config *Config) (consumer.ShipAssembledService, error) {
 	if d.consumerService == nil {
-		d.consumerService = consumer.NewService(d.WrappedConsumer(topicName, broker, groupId), d.ShipAssembledDecoder(), d.OrderService)
+		consumerWrapped, err := d.WrappedConsumer(config.ConsumeTopicName, config.KafkaBroker, config.ConsumerGroupId)
+		if err != nil {
+			return nil, err
+		}
+
+		orderService, err := d.NewOrderService(ctx, config)
+		if err != nil {
+			return nil, err
+		}
+
+		d.consumerService = consumer.NewService(consumerWrapped, d.ShipAssembledDecoder(), orderService)
 	}
 
-	return d.consumerService
+	return d.consumerService, nil
 }
 
 func (d *diContainer) ShipAssembledDecoder() producer.ShipAssembledDecoder {
@@ -137,47 +185,55 @@ func (d *diContainer) ShipAssembledDecoder() producer.ShipAssembledDecoder {
 	return d.assembledDecoder
 }
 
-func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) wrappedKafka.Consumer {
+func (d *diContainer) WrappedConsumer(topicName, broker, groupId string) (wrappedKafka.Consumer, error) {
 	if d.wrappedConsumer == nil {
+		consumerGroup, err := d.ConsumerGroup(broker, groupId)
+		if err != nil {
+			return nil, err
+		}
 		d.wrappedConsumer = wrappedKafkaConsumer.NewConsumer(
-			d.ConsumerGroup(broker, groupId),
+			consumerGroup,
 			[]string{topicName},
 			logger.Logger(),
 		)
 	}
 
-	return d.wrappedConsumer
+	return d.wrappedConsumer, nil
 }
 
-func (d *diContainer) WrappedProducer(topicName, broker string) wrappedKafka.Producer {
+func (d *diContainer) WrappedProducer(topicName, broker string) (wrappedKafka.Producer, error) {
 	if d.wrappedProducer == nil {
+		syncProducer, err := d.SyncProducer(broker)
+		if err != nil {
+			return nil, err
+		}
 		d.wrappedProducer = producer.NewProducer(
-			d.SyncProducer(broker),
+			syncProducer,
 			topicName,
 			logger.Logger(),
 		)
 	}
 
-	return d.wrappedProducer
+	return d.wrappedProducer, nil
 }
 
-func (d *diContainer) SyncProducer(broker string) sarama.SyncProducer {
+func (d *diContainer) SyncProducer(broker string) (sarama.SyncProducer, error) {
 	if d.syncProducer == nil {
 		p, err := sarama.NewSyncProducer(
 			[]string{broker},
 			producer.Config(),
 		)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create sync producer: %s\n", err.Error()))
+			return nil, fmt.Errorf("failed to create sync producer: %w", err)
 		}
 
 		d.syncProducer = p
 	}
 
-	return d.syncProducer
+	return d.syncProducer, nil
 }
 
-func (d *diContainer) ConsumerGroup(broker, groupId string) sarama.ConsumerGroup {
+func (d *diContainer) ConsumerGroup(broker, groupId string) (sarama.ConsumerGroup, error) {
 	if d.consumerGroup == nil {
 		consumerGroup, err := sarama.NewConsumerGroup(
 			[]string{broker},
@@ -185,11 +241,11 @@ func (d *diContainer) ConsumerGroup(broker, groupId string) sarama.ConsumerGroup
 			wrappedKafkaConsumer.Config(),
 		)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create consumer group: %s\n", err.Error()))
+			return nil, fmt.Errorf("failed to create consumer group: %w", err)
 		}
 
 		d.consumerGroup = consumerGroup
 	}
 
-	return d.consumerGroup
+	return d.consumerGroup, nil
 }

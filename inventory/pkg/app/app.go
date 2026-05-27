@@ -10,25 +10,25 @@ import (
 )
 
 type Config struct {
-	MongoURI string
-	MongoDB  string
-	GrpcPort string
+	MongoURI          string
+	MongoDB           string
+	GrpcPort          string
+	ServerAuthAddress string
 }
 
 type App struct {
 	Config    *Config
 	Container *Container
+	Cleanup   func()
 }
 
 func New(ctx context.Context, config *Config, initIndexes bool, seed bool) *App {
 	a := &App{Config: config}
 	var err error
-	var cleanup func()
-	a.Container, cleanup, err = InitializeContainer(ctx, config, initIndexes)
+	a.Container, a.Cleanup, err = InitializeContainer(ctx, config, initIndexes)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cleanup()
 
 	if seed {
 		a.Container.repository.Seed(ctx)

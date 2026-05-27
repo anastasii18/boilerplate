@@ -14,16 +14,16 @@ type Client struct {
 	paymentClient paymentV1.PaymentServiceClient
 }
 
-func NewClient(serverPaymentAddress string) (Client, error) {
+func NewClient(serverPaymentAddress string) (*Client, error) {
 	conn, err := grpc.NewClient(
 		serverPaymentAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return Client{}, fmt.Errorf("failed to connect: %w", err)
+		return &Client{}, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	return Client{
+	return &Client{
 		paymentClient: paymentV1.NewPaymentServiceClient(conn),
 	}, nil
 }

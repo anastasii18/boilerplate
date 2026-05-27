@@ -38,6 +38,10 @@ func main() {
 	log.Println("🛑 Shutting down gRPC server...")
 	a.Container.Server.GracefulStop()
 
+	if a.Cleanup != nil {
+		a.Cleanup() // Закрываем соединение с AuthService
+	}
+
 	// Закрываем соединение с MongoDB
 	if err := a.Container.DB.MongoClient.Disconnect(ctx); err != nil {
 		log.Printf("⚠️ Ошибка при отключении MongoDB: %v", err)
@@ -58,6 +62,7 @@ func initConfig() (*app.Config, error) {
 		"MONGO_URI":             &config.MongoURI,
 		"MONGO_INITDB_DATABASE": &config.MongoDB,
 		"GRPC_PORT":             &config.GrpcPort,
+		"SERVER_AUTH_ADDRESS":   &config.ServerAuthAddress,
 	}
 	for key, target := range secretsMapping {
 		*target = os.Getenv(key)

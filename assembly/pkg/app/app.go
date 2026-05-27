@@ -88,7 +88,7 @@ func (a *App) Run(ctx context.Context) error {
 	logger.Info(ctx, "Initiating graceful shutdown...")
 	consumerCancel()
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 15*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer shutdownCancel()
 
 	select {
@@ -104,7 +104,12 @@ func (a *App) Run(ctx context.Context) error {
 func (a *App) runConsumer(ctx context.Context) error {
 	logger.Info(ctx, "🚀 Assembly Kafka consumer running")
 
-	err := a.diContainer.ConsumerService(a.config.ProduceTopicName, a.config.ConsumeTopicName, a.config.KafkaBroker, a.config.ConsumerGroupId).RunConsumer(ctx)
+	consumerService, err := a.diContainer.ConsumerService(a.config.ProduceTopicName, a.config.ConsumeTopicName, a.config.KafkaBroker, a.config.ConsumerGroupId)
+	if err != nil {
+		return err
+	}
+
+	err = consumerService.RunConsumer(ctx)
 	if err != nil {
 		return err
 	}
